@@ -1,0 +1,14 @@
+{
+  "name": "zakher-garage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node scripts/build-static.js",
+    "test": "node --test --test-isolation=none tests/domain.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
