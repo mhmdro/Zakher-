@@ -1,1 +1,36 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#143f36"><title>زاخر | إدارة الكراج</title><link rel="stylesheet" href="./style.css"></head><body><aside><a class="brand" href="#">ز<span>زاخر<small>ZAKHER GARAGE</small></span></a><p class="nav-label">مساحة العمل</p><nav id="nav"></nav><div class="side-bottom"><span class="dot"></span> نسخة تجريبية محلية<small>إدارة أوضح. خدمة أفضل.</small></div></aside><main><header><div><span class="eyebrow">كراج زاخر لصيانة السيارات</span><p>مساحة عمل الكراج <span class="badge">تجريبي</span></p></div><div class="avatar">ز</div></header><div id="notice">البيانات محفوظة على هذا المتصفح فقط. صدّر نسخة احتياطية لحفظها أو نقلها.</div><section id="content"></section><footer>زاخر لصيانة السيارات <span>صُنع لتنظيم يومك</span></footer></main><dialog id="dialog"><form id="form"><div class="dialog-head"><h2 id="dialog-title"></h2><button type="button" id="close" class="ghost" aria-label="إغلاق">×</button></div><div id="fields"></div><p id="error" role="alert"></p><button class="primary" type="submit">حفظ البيانات</button></form></dialog><section id="print-area"></section><div id="toast" role="status"></div><script type="module" src="./app.js"></script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#153e35">
+  <title>زاخر | الورشة</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <aside>
+    <a class="brand" href="#" aria-label="زاخر الرئيسية">زاخر<span>لصيانة السيارات<small>ZAKHER GARAGE</small></span></a>
+    <p class="nav-label">إدارة الكراج</p><nav id="nav" aria-label="القائمة الرئيسية"></nav>
+    <div class="side-bottom"><span class="dot"></span>نسخة تجريبية<small>شغلك اليومي، بخطوات أقل</small></div>
+  </aside>
+  <main>
+    <header><div><span class="eyebrow">كراج زاخر لصيانة السيارات</span><p>كراج زاخر</p></div><span class="badge">تجريبي</span></header>
+    <div id="notice">بياناتك محفوظة على هذا الجهاز.<button class="ghost" data-page="backup">احفظ نسخة</button></div>
+    <section id="content"></section><footer>زاخر لصيانة السيارات<span>نسخة تجريبية · 02</span></footer>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-title">
+    <form id="form"><div class="dialog-head"><h2 id="dialog-title"></h2><button type="button" id="close" class="ghost" aria-label="إغلاق">×</button></div><div id="fields"></div><p id="error" class="form-error" role="alert"></p><button id="save-button" class="primary" type="submit">حفظ البيانات</button></form>
+  </dialog>
+  <dialog id="message-dialog" aria-labelledby="message-title">
+    <div class="dialog-head"><h2 id="message-title"></h2><button type="button" id="message-close" class="ghost" aria-label="إغلاق رسالة واتساب">×</button></div>
+    <p class="message-recipient">إلى: <b id="message-customer"></b></p>
+    <label class="field">رقم واتساب العميل<input id="wa-phone" type="tel" dir="ltr" inputmode="tel" placeholder="0501234567"></label>
+    <label class="field">نص الرسالة<textarea id="wa-text" class="message-box" rows="9"></textarea></label>
+    <p id="message-error" class="form-error" role="alert"></p>
+    <p class="hint">راجع الرقم والرسالة، ثم اضغط إرسال داخل واتساب. تعديل الرقم هنا يخص هذه الرسالة فقط.</p>
+    <a id="wa-send" class="message-send whatsapp" target="_blank" rel="noopener noreferrer">فتح واتساب للإرسال</a>
+  </dialog>
+  <section id="print-area"></section><div id="toast" role="status"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

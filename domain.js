@@ -15,6 +15,41 @@ export function createOrder(s,o){
  if(o.kind==='invoice'&&part)part.stock-=qty;
  s.orders.push(order);return order;
 }
+// Update pricing without changing the vehicle, workflow state or payment status.
+export function updateOrder(s,orderId,changes={}) {
+ const order=s.orders.find(o=>o.id===orderId);
+ if(!order)throw Error('أمر الصيانة غير موجود.');
+ if(order.kind==='invoice'&&order.paid)throw Error('ألغِ تسجيل الدفع أولًا لتعديل الفاتورة.');
+ if(!changes||typeof changes!=='object')throw Error('بيانات التعديل غير صحيحة.');
+ const description=changes.description===undefined?order.description:changes.description;
+ if(typeof description!=='string'||!description.trim())throw Error('أدخل وصف الخدمة');
+ const labor=amount(changes.labor===undefined?order.labor:changes.labor);
+ const partId=changes.partId===undefined?order.partId:changes.partId;
+ if(typeof partId!=='string')throw Error('اختر قطعة غيار صحيحة.');
+ const qty=Number(changes.qty===undefined?order.qty:changes.qty);
+ if(!Number.isSafeInteger(qty)||qty<0)throw Error('كمية القطعة غير صحيحة');
+ const part=partId?s.parts.find(p=>p.id===partId):null;
+ if(partId&&!part)throw Error('قطعة الغيار غير موجودة في المخزون.');
+ if(!part&&qty)throw Error('كمية القطعة غير صحيحة');
+ if(part&&qty<1)throw Error('حدد كمية القطع');
+ const oldPart=order.partId?s.parts.find(p=>p.id===order.partId):null;
+ if(order.kind==='invoice'&&order.qty&&!oldPart)throw Error('قطعة الفاتورة السابقة غير موجودة في المخزون.');
+ const samePart=!!part&&part.id===order.partId&&order.qty>0;
+ const available=part?part.stock+(order.kind==='invoice'&&samePart?order.qty:0):0;
+ if(order.kind==='invoice'&&part&&qty>available)throw Error('الكمية المطلوبة غير متوفرة');
+ const partPrice=part?(samePart?order.partPrice:part.price):0;
+ const unitCost=part?(samePart?order.cost/order.qty:part.cost):0;
+ const subtotal=money(labor+partPrice*qty),tax=money(subtotal*0.05),total=money(subtotal*1.05),cost=money(unitCost*qty);
+ if(![subtotal,tax,total,cost].every(Number.isFinite))throw Error('المبلغ أو الكمية أكبر من المسموح.');
+ const updated={description:description.trim(),labor,qty,partId:part?.id||'',partName:part?(samePart?order.partName:part.name):'',partPrice,cost,subtotal,tax,total};
+ // All validation is complete before either stock or the order changes.
+ if(order.kind==='invoice') {
+  if(oldPart)oldPart.stock+=order.qty;
+  if(part)part.stock-=qty;
+ }
+ Object.assign(order,updated);
+ return order;
+}
 export function summary(s){const invoices=s.orders.filter(o=>o.kind==='invoice');const revenue=money(invoices.reduce((a,o)=>a+o.subtotal,0)),cost=money(invoices.reduce((a,o)=>a+o.cost,0)),expenses=money(s.expenses.reduce((a,e)=>a+e.amount,0));return {revenue,cost,expenses,profit:money(revenue-cost-expenses),unpaid:money(invoices.filter(o=>!o.paid).reduce((a,o)=>a+o.total,0))}}
 export function validateBackup(s){
  if(!s||!['customers','vehicles','parts','orders','expenses'].every(k=>Array.isArray(s[k])))throw Error('ملف النسخة غير صالح');
@@ -25,3 +60,42 @@ export function validateBackup(s){
  return s;
 }
 export function demo(){let s=empty();s.customers=[{id:'c1',name:'أحمد المنصوري',phone:'0501234567'},{id:'c2',name:'خالد عبدالله',phone:'0507654321'}];s.vehicles=[{id:'v1',customerId:'c1',model:'Toyota Land Cruiser · 2022',plate:'أبوظبي  •  45821'},{id:'v2',customerId:'c2',model:'Nissan Patrol · 2021',plate:'أبوظبي  •  92104'}];s.parts=[{id:'p1',name:'فلتر زيت / Oil filter',stock:18,cost:25,price:45},{id:'p2',name:'زيت محرك / Engine oil',stock:4,cost:90,price:140}];createOrder(s,{vehicleId:'v1',description:'تغيير زيت المحرك والفلاتر / Oil service',kind:'invoice',labor:180,partId:'p1',qty:1});s.expenses=[{id:'e1',name:'مستلزمات الورشة',amount:40}];return s}
+
+// Preparing a click-to-chat link does not send a message or change an order.
+export function normalizeWhatsAppPhone(input) {
+ const invalid=()=>new Error('أدخل رقم واتساب صحيحًا: 0501234567 أو رقمًا دوليًا يبدأ بـ + أو 00.');
+ if(typeof input!=='string')throw invalid();
+ let phone=input.trim()
+  .replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-0x0660))
+  .replace(/[۰-۹]/g,d=>String(d.charCodeAt(0)-0x06f0))
+  .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'');
+ if(!phone||!/^[\d+\s()-]+$/.test(phone))throw invalid();
+ phone=phone.replace(/[\s()-]/g,'');
+ if(/^05\d{8}$/.test(phone))return '971'+phone.slice(1);
+ const international=phone.startsWith('+')||phone.startsWith('00');
+ if(phone.startsWith('+'))phone=phone.slice(1);
+ else if(phone.startsWith('00'))phone=phone.slice(2);
+ // An unprefixed UAE mobile is unambiguous; other countries need + or 00.
+ if(!international&&!/^9715\d{8}$/.test(phone))throw invalid();
+ if(!/^[1-9]\d{7,14}$/.test(phone))throw invalid();
+ if(phone.startsWith('9715')&&!/^9715\d{8}$/.test(phone))throw invalid();
+ return phone;
+}
+
+export function buildWhatsAppUrl(phone,text) {
+ const destination=normalizeWhatsAppPhone(phone);
+ if(typeof text!=='string'||!text.trim())throw Error('اكتب نص رسالة واتساب أولًا.');
+ return `https://wa.me/${destination}?text=${encodeURIComponent(text)}`;
+}
+
+export function serviceMessage({kind,customerName,model,plate,orderNumber}={}) {
+ if(!['received','ready'].includes(kind))throw Error('اختر رسالة استلام السيارة أو جاهزيتها.');
+ const clean=value=>String(value??'').trim();
+ const name=clean(customerName)||'عميلنا العزيز';
+ const car=[clean(model),clean(plate)?`لوحة ${clean(plate)}`:''].filter(Boolean).join('، ');
+ const reference=clean(orderNumber)?`\nرقم أمر الصيانة: ${clean(orderNumber)}`:'';
+ const update=kind==='received'
+  ?`تم استلام سيارتك${car?` (${car})`:''} للصيانة. سنبلغك عند جاهزيتها.`
+  :`اكتملت صيانة سيارتك${car?` (${car})`:''} وهي جاهزة للاستلام.`;
+ return `مرحبًا ${name}،\nكراج زاخر لصيانة السيارات.\n${update}${reference}\nشكرًا لثقتك بنا.`;
+}
