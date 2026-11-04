@@ -181,6 +181,8 @@ $('#form').addEventListener('submit',event=>{
 $('#close').onclick=()=>$('#dialog').close();$('#message-close').onclick=()=>$('#message-dialog').close();
 $('#wa-send').addEventListener('click',event=>{updateMessageLink();if(!$('#wa-send').hasAttribute('href'))event.preventDefault()});
 document.addEventListener('click',event=>{
+  const home=event.target.closest('a[data-home]');
+  if(home&&!event.defaultPrevented&&event.button===0&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&!event.altKey){event.preventDefault();workFilter='active';navigate('dashboard');return}
   const button=event.target.closest('button');if(!button)return;
   if(button.dataset.page)navigate(button.dataset.page);
   if(button.dataset.filter){workFilter=button.dataset.filter;render()}
@@ -239,8 +241,9 @@ function printOrder(orderId){
       <section class="document-party"><h3>${safeLabel('بيانات السيارة')}</h3><dl>${detail('السيارة',car?.model)}${detail('لوحة المركبة',car?.plate)}</dl></section>
     </div>
     <table class="document-items"><colgroup><col class="document-description-column"><col class="document-quantity-column"><col class="document-amount-column"></colgroup><thead><tr>${['الوصف','الكمية','المبلغ'].map(text=>`<th>${safeLabel(text)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>
-    <div class="document-summary"><div class="totals">${totalRow('المجموع',order.subtotal)}${totalRow('الضريبة التجريبية ٥٪',order.tax)}${totalRow('الإجمالي',order.total,'document-grand-total')}${order.kind==='invoice'?`${totalRow('المدفوع',balance.received)}${totalRow('المتبقي',balance.remaining,'document-balance')}`:''}</div></div>
+    <div class="document-signoff"><div class="document-summary"><div class="totals">${totalRow('المجموع',order.subtotal)}${totalRow('الضريبة التجريبية ٥٪',order.tax)}${totalRow('الإجمالي',order.total,'document-grand-total')}${order.kind==='invoice'?`${totalRow('المدفوع',balance.received)}${totalRow('المتبقي',balance.remaining,'document-balance')}`:''}</div></div>
     <div class="document-footer"><div class="document-closing"><span class="document-eyebrow" dir="ltr">ZAKHER · AUTO MAINTENANCE</span><p class="document-thanks">${safeLabel('شكرًا لثقتكم.')}</p><p class="document-disclaimer">${safeLabel('مستند تجريبي، غير معتمد ضريبيًا.')}</p></div><div class="document-seal"><div class="garage-stamp" aria-label="${safeLabel('كراج زاخر لصيانة السيارات')}"><span class="stamp-stars" aria-hidden="true">✦ &nbsp; ✦ &nbsp; ✦</span><span class="stamp-garage">${english?'ZAKHER GARAGE':'كراج زاخر'}</span><strong class="stamp-name" dir="${english?'rtl':'ltr'}">${english?'زاخر':'ZAKHER'}</strong><span class="stamp-service">${english?'AUTO MAINTENANCE':'لصيانة السيارات'}</span></div><p class="electronic-stamp">${stampLabel}</p></div></div>
+    </div>
   </div>`;
   window.print();
 }
