@@ -1,0 +1,3 @@
+# Preserve the bytes checked by tests/vin.test.js on every checkout platform.
+vendor/ocr/** -text
+assets/ocr/** -text
