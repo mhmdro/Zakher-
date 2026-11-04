@@ -62,16 +62,27 @@ const legacy={
     };
     const assertVehiclePreview=async()=>{
       const model=p.locator('#form [name="model"]'),preview=p.locator('#vehicle-preview');
-      await model.fill('Toyota Land Cruiser 2022');
-      assert((await preview.locator('img').getAttribute('src')).endsWith('/suv-large.svg'));
-      assert((await preview.locator('b').textContent()).includes('Toyota Land Cruiser'));
-      await p.waitForFunction(()=>{const image=document.querySelector('#vehicle-preview img');return image?.complete&&image.naturalWidth>0});
-      const suvSource=await preview.locator('img').getAttribute('src');
-      await model.fill('Toyota Camry 2024');
-      assert((await preview.locator('img').getAttribute('src')).endsWith('/sedan-camry.svg'));
-      assert.notEqual(await preview.locator('img').getAttribute('src'),suvSource,'Changing model changes the visible vehicle illustration');
-      assert((await preview.locator('b').textContent()).includes('Toyota Camry'));
-      await p.waitForFunction(()=>{const image=document.querySelector('#vehicle-preview img');return image?.complete&&image.naturalWidth>0});
+      const logoPath=async()=>new URL(await preview.locator('img').getAttribute('src'),baseURL).pathname;
+      const loaded=()=>p.waitForFunction(()=>{const image=document.querySelector('#vehicle-preview img');return image?.complete&&image.naturalWidth>0});
+      await model.fill('نيسان ألتيما 2022');
+      assert((await logoPath()).endsWith('/assets/brands/nissan.svg'));
+      assert(/Nissan|نيسان/i.test(await preview.locator('b').textContent()));await loaded();
+      const nissanSource=await logoPath();
+      for(const name of ['Nissan Altima 2022','Altima','Nissan']){
+        await model.fill(name);assert.equal(await logoPath(),nissanSource,'Arabic, English, model-only and make-only names share the Nissan logo');
+        await loaded();
+      }
+      await model.fill('Toyota');
+      assert((await logoPath()).endsWith('/assets/brands/toyota.svg'));
+      assert.notEqual(await logoPath(),nissanSource,'Changing manufacturer changes its logo');
+      assert(/Toyota|تويوتا/i.test(await preview.locator('b').textContent()));await loaded();
+      const toyotaSource=await logoPath();await model.fill('Toyota Camry 2024');
+      assert.equal(await logoPath(),toyotaSource,'Models of the same manufacturer keep its actual logo');
+      await model.fill('بي ام');assert((await logoPath()).endsWith('/assets/brands/bmw.svg'));
+      assert(/BMW|بي إم|بي ام/i.test(await preview.locator('b').textContent()));await loaded();
+      await model.fill('Unknown Workshop Car');
+      assert.equal(await preview.locator('img').count(),0,'Unknown names use a neutral fallback, never a generated car illustration');
+      assert((await preview.textContent()).trim().length>0);
     };
     const add=async(kind,values)=>{
       await p.locator(`[data-add="${kind}"]`).first().click();
@@ -92,6 +103,12 @@ const legacy={
     await p.reload();await p.waitForSelector('h1');
     assert.deepEqual(await data(),legacy,'Reload must retain the existing storage key and data');
     assert.equal(await p.locator('#nav button').count(),4,'Primary navigation stays compact');
+    const savedToyota=card('legacy-order').locator('.vehicle-emblem img');
+    assert.equal(await savedToyota.count(),1,'Previously saved cars get the matching manufacturer logo');
+    assert(new URL(await savedToyota.getAttribute('src'),baseURL).pathname.endsWith('/assets/brands/toyota.svg'));
+    await savedToyota.scrollIntoViewIfNeeded();
+    await p.waitForFunction(()=>{const image=document.querySelector('.vehicle-emblem img');return image?.complete&&image.naturalWidth>0});
+    assert.equal(await p.locator('.vehicle-emblem img[src*="/assets/vehicles/"]').count(),0);
 
     // Previewing/editing a receipt must not change an order or claim delivery.
     assert.equal(await card('legacy-order').locator('[data-message="ready"]').count(),0);
@@ -154,6 +171,7 @@ const legacy={
     assert.equal(saved.customers.at(-1).phone,'+971501112233');assert.equal(saved.orders.at(-1).total,0);
     assert.equal(saved.orders.at(-1).messageLanguage,'en');
     assert.equal(saved.orders.at(-1).vehicleId,vid);assert.equal(saved.vehicles.at(-1).customerId,cid);
+    assert.equal(await card(intakeId).locator('.vehicle-emblem img').count(),0,'An unknown saved model keeps a neutral fallback without a fake logo');
     await card(intakeId).locator('[data-message="received"]').click();
     assert.equal(new URL(await p.locator('#wa-send').getAttribute('href')).pathname,'/971501112233');
     assert.equal(await p.locator('#message-language').inputValue(),'en');assert.equal(await p.locator('#wa-text').getAttribute('dir'),'ltr');
@@ -287,7 +305,7 @@ const legacy={
     assert.equal(sendRequests,0,'Static demo must not attempt backend sends');
     assert.equal(context.pages().length,1,'No WhatsApp popup should be opened');
     assert.deepEqual(errors,[],'No JavaScript errors');
-    console.log('PASS: legacy-data preservation; new/existing/returning intake; bilingual emoji templates, edited drafts, preferences and optional auto-receipt preview; dynamic car art; receipt/ready previews and phone validation; no WhatsApp sends; invoice editing/atomic stock validation/paid edit protection; inventory/VAT/cost/payment; quote; profit; bilingual print; export/change/import; 390px pages/dialog; no JS errors');
+    console.log('PASS: legacy-data preservation; new/existing/returning intake; bilingual emoji templates, edited drafts, preferences and optional auto-receipt preview; manufacturer logos/live Arabic-English aliases/neutral fallback; receipt/ready previews and phone validation; no WhatsApp sends; invoice editing/atomic stock validation/paid edit protection; inventory/VAT/cost/payment; quote; profit; bilingual print; export/change/import; 390px pages/dialog; no JS errors');
   } finally {
     await context?.close();await browser?.close();if(temp)await rm(temp,{recursive:true,force:true});
   }

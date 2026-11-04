@@ -1,5 +1,5 @@
-import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=4';
-import {vehicleArtwork} from './vehicle-art.js?v=4';
+import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=5';
+import {vehicleArtwork} from './vehicle-art.js?v=5';
 
 const $=selector=>document.querySelector(selector);
 const key='zakher-garage-v1';
@@ -37,7 +37,7 @@ function orderCard(order){
   const car=vehicle(order),owner=customer(car),quote=order.kind==='quote',ready=isReady(order),art=vehicleArtwork(car?.model);
   return `<article class="work-card ${ready?'ready':''}">
     <div class="card-top"><span class="pill ${quote?'blue':ready?'done':''}">${quote?'عرض سعر':ready?'جاهزة للتسليم':'داخل الورشة'}</span><span class="order-number" dir="ltr">${esc(order.number)}</span></div>
-    <div class="vehicle-heading"><div class="vehicle-emblem" title="${esc(art.label)} — رسم توضيحي" aria-hidden="true"><img src="${esc(art.src)}" alt="" loading="lazy" decoding="async"></div><div><h2 class="car-name" dir="auto">${esc(car?.model)}</h2><span class="vehicle-subtitle">بطاقة صيانة</span></div></div>
+    <div class="vehicle-heading"><div class="vehicle-emblem" title="${esc(art.label)}" aria-hidden="true">${art.src?`<img src="${esc(art.src)}" alt="" loading="lazy" decoding="async">`:'<span class="vehicle-mark-empty">؟</span>'}</div><div><h2 class="car-name" dir="auto">${esc(car?.model)}</h2><span class="vehicle-subtitle">بطاقة صيانة</span></div></div>
     <div class="plate"><span class="plate-label">لوحة المركبة</span><bdi class="plate-number" dir="auto">${esc(car?.plate)}</bdi></div>
     <div class="card-info"><div class="info-item"><span class="info-label">العميل</span><p class="info-value customer-line">${esc(owner?.name)}</p></div><div class="info-item"><span class="info-label">الخدمة</span><p class="info-value service-description">${esc(order.description)}</p></div></div>
     ${quote?'':`<div class="card-actions">${!ready?`<button class="primary" data-status="${esc(order.id)}">${icon('check')}السيارة جاهزة</button>`:''}<button class="whatsapp" data-message="${ready?'ready':'received'}" data-order="${esc(order.id)}">${icon('chat')}${ready?'واتساب: السيارة جاهزة':'واتساب: تم الاستلام'}</button></div>`}
@@ -70,7 +70,7 @@ function render(){
 const field=(name,label,type='text',value='',extra='')=>`<label class="field">${label}<input required name="${name}" type="${type}" value="${esc(value)}" ${type==='number'?`min="0" step="${['qty','stock'].includes(name)?'1':'0.01'}"`:''} ${type==='tel'?'dir="ltr" inputmode="tel" placeholder="0501234567"':''} ${extra}></label>`;
 const select=(name,label,options,optional=false,emptyText='')=>`<label class="field">${label}<select name="${name}" ${optional?'':'required'}><option value="">${emptyText||(optional?'بدون قطعة':'اختر...')}</option>${options.map(([value,text])=>`<option value="${esc(value)}">${esc(text)}</option>`).join('')}</select></label>`;
 function charges(order){return field('labor','أجور العمل بالدرهم','number',order?.labor??'0')+select('partId','قطعة غيار',state.parts.map(p=>[p.id,`${p.name} (${p.stock} متوفر) — ${cash(p.price)}`]),true)+field('qty','كمية القطع','number',order?.qty??'0')+'<p class="hint">تُضاف ضريبة تجريبية ٥٪. بدون قطعة اترك الكمية صفرًا.</p>'}
-function vehiclePreviewMarkup(model){const art=vehicleArtwork(model);return `<img src="${esc(art.src)}" alt=""><div><b>${esc(art.label)}</b><small>${art.id==='generic'?'اكتب الشركة والموديل لإظهار شكل أقرب.':'رسم توضيحي حسب الاسم، وليس صورة لسنة تصنيع محددة.'}</small></div>`}
+function vehiclePreviewMarkup(model){const art=vehicleArtwork(model);const mark=art.src?`<img src="${esc(art.src)}" alt="">`:'<span class="vehicle-mark-empty" aria-hidden="true">؟</span>';return `${mark}<div><b>${esc(art.src?art.label:'شعار الشركة')}</b><small>${art.src?'شعار شركة السيارة المطابق للاسم.':String(model||'').trim()?'لم أتعرف على الشركة بعد. أضف اسمها بالعربي أو الإنجليزي.':'اكتب الشركة أو الموديل لعرض شعارها.'}</small></div>`}
 function modelField(label){return field('model',label)+`<div id="vehicle-preview" class="vehicle-preview">${vehiclePreviewMarkup('')}</div>`}
 function notificationFields(){return `<div class="form-section notification-options"><label class="field">لغة رسالة العميل<select name="messageLanguage"><option value="ar">العربية</option><option value="en">English</option></select></label><label class="check-option"><input type="checkbox" name="previewReceipt" value="yes" ${preferences.openReceiptAfterIntake?'checked':''}><span>اعرض رسالة الاستلام بعد الحفظ</span></label><p class="hint">هذا يفتح المعاينة فقط. الإرسال يتم من واتساب بعد مراجعتك.</p></div>`}
 function open(kind,options={}){
