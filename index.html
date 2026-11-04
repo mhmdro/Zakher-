@@ -7,34 +7,34 @@
   <title>زاخر | الورشة</title>
   <link rel="preload" href="./assets/fonts/tajawal-arabic-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="./assets/fonts/tajawal-arabic-700-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=5">
+  <link rel="stylesheet" href="./style.css?v=6">
 </head>
 <body>
   <aside>
-    <a class="brand" href="./" aria-label="زاخر الرئيسية"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M8 8h16L8 24h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span><span class="brand-copy"><b>زاخر</b><small>ZAKHER AUTO CARE</small></span></a>
-    <p class="nav-label">مساحة العمل</p><nav id="nav" aria-label="القائمة الرئيسية"></nav>
-    <div class="side-bottom"><span class="dot"></span>بياناتك على هذا الجهاز<small>زاخر · إدارة الصيانة</small></div>
+    <a class="brand" href="./" aria-label="زاخر الرئيسية" data-i18n-aria-label="زاخر الرئيسية"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M8 8h16L8 24h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span><span class="brand-copy"><b data-i18n="زاخر">زاخر</b><small>ZAKHER AUTO CARE</small></span></a>
+    <p class="nav-label" data-i18n="مساحة العمل">مساحة العمل</p><nav id="nav" aria-label="القائمة الرئيسية" data-i18n-aria-label="القائمة الرئيسية"></nav>
+    <div class="side-bottom"><span class="dot"></span><span data-i18n="بياناتك على هذا الجهاز">بياناتك على هذا الجهاز</span><small data-i18n="زاخر · إدارة الصيانة">زاخر · إدارة الصيانة</small></div>
   </aside>
   <main>
-    <header class="topbar"><div class="header-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M8 8h16L8 24h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span><div class="brand-copy"><p>كراج زاخر</p><small>ZAKHER AUTO CARE</small></div></div><div class="header-meta"><span id="current-date" class="current-date"></span><span class="badge">نسخة تجريبية</span></div></header>
+    <header class="topbar"><div class="header-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M8 8h16L8 24h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span><div class="brand-copy"><p data-i18n="كراج زاخر">كراج زاخر</p><small>ZAKHER AUTO CARE</small></div></div><div class="header-meta"><span id="current-date" class="current-date"></span><label class="ui-language-control"><span data-i18n="لغة الواجهة">لغة الواجهة</span><select id="ui-language" aria-label="لغة الواجهة" data-i18n-aria-label="لغة الواجهة"><option value="ar">العربية</option><option value="en">English</option></select></label><span class="badge" data-i18n="نسخة تجريبية">نسخة تجريبية</span></div></header>
     <section id="content"></section>
-    <div id="notice">بياناتك محفوظة على هذا الجهاز.<button class="ghost" data-page="backup">حفظ نسخة احتياطية</button></div>
-    <footer><span>زاخر لصيانة السيارات</span><span dir="ltr">ZAKHER · v05</span></footer>
+    <div id="notice"><span id="notice-text" data-i18n="بياناتك محفوظة على هذا الجهاز.">بياناتك محفوظة على هذا الجهاز.</span><button class="ghost" data-page="backup" data-i18n="حفظ نسخة احتياطية">حفظ نسخة احتياطية</button></div>
+    <footer><span data-i18n="زاخر لصيانة السيارات">زاخر لصيانة السيارات</span><span dir="ltr">ZAKHER · v06</span></footer>
   </main>
   <dialog id="dialog" aria-labelledby="dialog-title">
-    <form id="form"><div class="dialog-head"><h2 id="dialog-title"></h2><button type="button" id="close" class="ghost" aria-label="إغلاق">×</button></div><div id="fields"></div><p id="error" class="form-error" role="alert"></p><button id="save-button" class="primary" type="submit">حفظ البيانات</button></form>
+    <form id="form"><div class="dialog-head"><h2 id="dialog-title"></h2><button type="button" id="close" class="ghost" aria-label="إغلاق" data-i18n-aria-label="إغلاق">×</button></div><div id="fields"></div><p id="error" class="form-error" role="alert"></p><button id="save-button" class="primary" type="submit" data-i18n="حفظ البيانات">حفظ البيانات</button></form>
   </dialog>
   <dialog id="message-dialog" aria-labelledby="message-title">
-    <div class="dialog-head"><h2 id="message-title"></h2><button type="button" id="message-close" class="ghost" aria-label="إغلاق رسالة واتساب">×</button></div>
-    <p class="message-recipient">إلى: <b id="message-customer"></b></p>
-    <label class="field">رقم واتساب العميل<input id="wa-phone" type="tel" dir="ltr" inputmode="tel" placeholder="0501234567"></label>
-    <label class="field">لغة الرسالة<select id="message-language"><option value="ar">العربية</option><option value="en">English</option></select></label>
-    <label class="field">نص الرسالة<textarea id="wa-text" class="message-box" rows="9"></textarea></label>
+    <div class="dialog-head"><h2 id="message-title"></h2><button type="button" id="message-close" class="ghost" aria-label="إغلاق رسالة واتساب" data-i18n-aria-label="إغلاق رسالة واتساب">×</button></div>
+    <p class="message-recipient"><span data-i18n="إلى">إلى</span>: <b id="message-customer"></b></p>
+    <label class="field"><span data-i18n="رقم واتساب العميل">رقم واتساب العميل</span><input id="wa-phone" type="tel" dir="ltr" inputmode="tel" placeholder="0501234567"></label>
+    <label class="field"><span data-i18n="لغة الرسالة">لغة الرسالة</span><select id="message-language"><option value="ar" data-i18n="العربية">العربية</option><option value="en">English</option></select></label>
+    <label class="field"><span data-i18n="نص الرسالة">نص الرسالة</span><textarea id="wa-text" class="message-box" rows="9"></textarea></label>
     <p id="message-error" class="form-error" role="alert"></p>
-    <p class="hint">راجع الرقم والرسالة، ثم اضغط إرسال داخل واتساب. تعديل الرقم هنا يخص هذه الرسالة فقط.</p>
-    <a id="wa-send" class="message-send whatsapp" target="_blank" rel="noopener noreferrer">فتح واتساب للإرسال</a>
+    <p class="hint" data-i18n="راجع الرقم والرسالة، ثم اضغط إرسال داخل واتساب. تعديل الرقم هنا يخص هذه الرسالة فقط.">راجع الرقم والرسالة، ثم اضغط إرسال داخل واتساب. تعديل الرقم هنا يخص هذه الرسالة فقط.</p>
+    <a id="wa-send" class="message-send whatsapp" target="_blank" rel="noopener noreferrer" data-i18n="فتح واتساب للإرسال">فتح واتساب للإرسال</a>
   </dialog>
   <section id="print-area"></section><div id="toast" role="status"></div>
-  <script type="module" src="./app.js?v=5"></script>
+  <script type="module" src="./app.js?v=6"></script>
 </body>
 </html>
