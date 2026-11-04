@@ -3,20 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#153e35">
+  <meta name="theme-color" content="#142331">
   <title>زاخر | الورشة</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="preload" href="./assets/fonts/tajawal-arabic-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/fonts/tajawal-arabic-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./style.css?v=3">
 </head>
 <body>
   <aside>
-    <a class="brand" href="#" aria-label="زاخر الرئيسية">زاخر<span>لصيانة السيارات<small>ZAKHER GARAGE</small></span></a>
-    <p class="nav-label">إدارة الكراج</p><nav id="nav" aria-label="القائمة الرئيسية"></nav>
-    <div class="side-bottom"><span class="dot"></span>نسخة تجريبية<small>شغلك اليومي، بخطوات أقل</small></div>
+    <a class="brand" href="./" aria-label="زاخر الرئيسية"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M8 8h16L8 24h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span><span class="brand-copy"><b>زاخر</b><small>ZAKHER AUTO CARE</small></span></a>
+    <p class="nav-label">مساحة العمل</p><nav id="nav" aria-label="القائمة الرئيسية"></nav>
+    <div class="side-bottom"><span class="dot"></span>بياناتك على هذا الجهاز<small>زاخر · إدارة الصيانة</small></div>
   </aside>
   <main>
-    <header><div><span class="eyebrow">كراج زاخر لصيانة السيارات</span><p>كراج زاخر</p></div><span class="badge">تجريبي</span></header>
-    <div id="notice">بياناتك محفوظة على هذا الجهاز.<button class="ghost" data-page="backup">احفظ نسخة</button></div>
-    <section id="content"></section><footer>زاخر لصيانة السيارات<span>نسخة تجريبية · 02</span></footer>
+    <header class="topbar"><div class="header-brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M8 8h16L8 24h16" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg></span><div class="brand-copy"><p>كراج زاخر</p><small>ZAKHER AUTO CARE</small></div></div><div class="header-meta"><span id="current-date" class="current-date"></span><span class="badge">نسخة تجريبية</span></div></header>
+    <section id="content"></section>
+    <div id="notice">بياناتك محفوظة على هذا الجهاز.<button class="ghost" data-page="backup">حفظ نسخة احتياطية</button></div>
+    <footer><span>زاخر لصيانة السيارات</span><span dir="ltr">ZAKHER · v03</span></footer>
   </main>
   <dialog id="dialog" aria-labelledby="dialog-title">
     <form id="form"><div class="dialog-head"><h2 id="dialog-title"></h2><button type="button" id="close" class="ghost" aria-label="إغلاق">×</button></div><div id="fields"></div><p id="error" class="form-error" role="alert"></p><button id="save-button" class="primary" type="submit">حفظ البيانات</button></form>
@@ -31,6 +34,6 @@
     <a id="wa-send" class="message-send whatsapp" target="_blank" rel="noopener noreferrer">فتح واتساب للإرسال</a>
   </dialog>
   <section id="print-area"></section><div id="toast" role="status"></div>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=3"></script>
 </body>
 </html>
