@@ -6,12 +6,14 @@ export function createOrder(s,o){
  if(!s.vehicles.some(v=>v.id===o.vehicleId))throw Error('اختر سيارة مسجلة');
  if(!o.description?.trim())throw Error('أدخل وصف الخدمة');
  if(!['quote','invoice'].includes(o.kind))throw Error('نوع المستند غير صالح');
+ if(o.messageLanguage!==undefined&&!['ar','en'].includes(o.messageLanguage))throw Error('اختر العربية أو الإنجليزية لرسالة واتساب.');
  const labor=amount(o.labor),qty=Number(o.qty||0),part=o.partId?s.parts.find(p=>p.id===o.partId):null;
  if(!Number.isInteger(qty)||qty<0||(!part&&qty))throw Error('كمية القطعة غير صحيحة');
  if(part&&qty<1)throw Error('حدد كمية القطع');
  if(o.kind==='invoice'&&part&&qty>part.stock)throw Error('الكمية المطلوبة غير متوفرة');
  const subtotal=money(labor+(part?part.price*qty:0));
  const order={id:id(),number:`${o.kind==='quote'?'Q':'INV'}-${s.orders.length+1001}`,date:new Date().toISOString(),vehicleId:o.vehicleId,description:o.description.trim(),kind:o.kind,status:o.kind==='quote'?'عرض سعر':'قيد العمل',paid:false,labor,qty,partId:part?.id||'',partName:part?.name||'',partPrice:part?.price||0,cost:money((part?.cost||0)*qty),subtotal,tax:money(subtotal*0.05),total:money(subtotal*1.05)};
+ if(o.messageLanguage!==undefined)order.messageLanguage=o.messageLanguage;
  if(o.kind==='invoice'&&part)part.stock-=qty;
  s.orders.push(order);return order;
 }
@@ -56,6 +58,7 @@ export function validateBackup(s){
  const str=x=>typeof x==='string',num=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
  for(const k of ['customers','vehicles','parts','orders','expenses']){if(s[k].some(x=>!x||!str(x.id))||new Set(s[k].map(x=>x.id)).size!==s[k].length)throw Error('معرّفات غير صالحة')}
  if(s.customers.some(x=>!str(x.name)||!str(x.phone))||s.vehicles.some(x=>!str(x.model)||!str(x.plate)||!s.customers.some(c=>c.id===x.customerId))||s.parts.some(x=>!str(x.name)||!num(x.price)||!num(x.cost)||!Number.isInteger(x.stock)||x.stock<0)||s.expenses.some(x=>!str(x.name)||!num(x.amount)))throw Error('بيانات غير صالحة');
+ if(s.orders.some(x=>Object.hasOwn(x,'messageLanguage')&&!['ar','en'].includes(x.messageLanguage)))throw Error('لغة رسالة المستند غير صالحة');
  if(s.orders.some(x=>!['quote','invoice'].includes(x.kind)||!str(x.number)||!str(x.description)||!str(x.status)||!str(x.date)||!str(x.partName)||typeof x.paid!=='boolean'||!s.vehicles.some(v=>v.id===x.vehicleId)||!['labor','qty','partPrice','cost','subtotal','tax','total'].every(k=>num(x[k]))))throw Error('مستند غير صالح');
  return s;
 }
@@ -88,14 +91,20 @@ export function buildWhatsAppUrl(phone,text) {
  return `https://wa.me/${destination}?text=${encodeURIComponent(text)}`;
 }
 
-export function serviceMessage({kind,customerName,model,plate,orderNumber}={}) {
+export function serviceMessage({kind,customerName,model,plate,orderNumber,language='ar'}={}) {
  if(!['received','ready'].includes(kind))throw Error('اختر رسالة استلام السيارة أو جاهزيتها.');
+ if(!['ar','en'].includes(language))throw Error('اختر العربية أو الإنجليزية لرسالة واتساب.');
  const clean=value=>String(value??'').trim();
- const name=clean(customerName)||'عميلنا العزيز';
- const car=[clean(model),clean(plate)?`لوحة ${clean(plate)}`:''].filter(Boolean).join('، ');
- const reference=clean(orderNumber)?`\nرقم أمر الصيانة: ${clean(orderNumber)}`:'';
- const update=kind==='received'
-  ?`تم استلام سيارتك${car?` (${car})`:''} للصيانة. سنبلغك عند جاهزيتها.`
-  :`اكتملت صيانة سيارتك${car?` (${car})`:''} وهي جاهزة للاستلام.`;
- return `مرحبًا ${name}،\nكراج زاخر لصيانة السيارات.\n${update}${reference}\nشكرًا لثقتك بنا.`;
+ const arabic=language==='ar';
+ const name=clean(customerName)||(arabic?'عميلنا العزيز':'valued customer');
+ const labels=arabic
+  ?{greeting:`مرحبًا ${name} 👋`,garage:'*كراج زاخر لصيانة السيارات*',vehicle:'السيارة',plate:'رقم اللوحة',order:'رقم أمر الصيانة',received:'🔧 تم استلام سيارتك للصيانة.',ready:'✅ اكتملت صيانة سيارتك وهي جاهزة للاستلام.',next:'سنبلغك عند جاهزيتها.',thanks:'💙 شكرًا لثقتك بنا.'}
+  :{greeting:`Hello ${name} 👋`,garage:'*Zakher Garage · Auto Maintenance*',vehicle:'Vehicle',plate:'Plate',order:'Service order',received:"🔧 We've received your vehicle for service.",ready:"✅ Your vehicle's service is complete and it's ready for collection.",next:"We'll notify you when it's ready for collection.",thanks:'💙 Thank you for your trust.'};
+ const details=[
+  clean(model)?`🚘 ${labels.vehicle}: ${clean(model)}`:'',
+  clean(plate)?`📍 ${labels.plate}: ${clean(plate)}`:'',
+  clean(orderNumber)?`🧾 ${labels.order}: ${clean(orderNumber)}`:''
+ ].filter(Boolean).join('\n');
+ const closing=[kind==='received'?labels.next:'',labels.thanks].filter(Boolean).join('\n');
+ return [labels.greeting,labels.garage,labels[kind],details,closing].filter(Boolean).join('\n\n');
 }

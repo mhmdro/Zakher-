@@ -1,4 +1,5 @@
-import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=3';
+import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=4';
+import {vehicleArtwork} from './vehicle-art.js?v=4';
 
 const $=selector=>document.querySelector(selector);
 const key='zakher-garage-v1';
@@ -10,7 +11,11 @@ try {
   $('#notice').textContent='تعذّر فتح البيانات المحفوظة. استعد نسخة احتياطية قبل إضافة بيانات جديدة.';
   $('#notice').classList.add('notice-error');$('#content').before($('#notice'));
 }
-let page='dashboard',query='',workFilter='active',submit,toastTimer;
+const preferenceKey='zakher-preferences-v1';
+let preferences={language:'ar',openReceiptAfterIntake:false};
+try{const saved=JSON.parse(localStorage.getItem(preferenceKey)||'{}');if(['ar','en'].includes(saved.language))preferences.language=saved.language;if(typeof saved.openReceiptAfterIntake==='boolean')preferences.openReceiptAfterIntake=saved.openReceiptAfterIntake}catch{}
+function savePreferences(patch){try{const next={...preferences,...patch};localStorage.setItem(preferenceKey,JSON.stringify(next));preferences=next;return true}catch{toast('تعذّر حفظ التفضيل على هذا الجهاز.');return false}}
+let page='dashboard',query='',workFilter='active',submit,toastTimer,messageContext,messageDrafts={},messageLanguage='ar';
 const tabs=[['dashboard','car','الورشة'],['orders','file','الفواتير'],['customers','users','العملاء'],['more','menu','المزيد']];
 const paths={car:'M5 17H3v-6l2-6h14l2 6v6h-2M5 17h14M5 17v3m14-3v3M3 11h18M7 14h.01M17 14h.01',file:'M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6',users:'M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3M16 4a4 4 0 0 1 0 8M22 21v-3a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',menu:'M4 6h16M4 12h16M4 18h16',plus:'M12 5v14M5 12h14',check:'m5 12 4 4L19 6',chat:'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z',box:'m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9',money:'M3 5h18v14H3V5Zm12 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',backup:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5'};
 const icon=name=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.file}"/></svg>`;
@@ -29,10 +34,10 @@ function table(headers,rows){return rows.length?`<div class="table-wrap"><table>
 function searchField(placeholder){return `<input id="search" aria-label="${placeholder}" placeholder="${placeholder}" value="${esc(query)}" type="search">`}
 function matches(order){const v=vehicle(order);return [order.number,order.description,customer(v)?.name,v?.model,v?.plate].join(' ').toLowerCase().includes(query.toLowerCase())}
 function orderCard(order){
-  const car=vehicle(order),owner=customer(car),quote=order.kind==='quote',ready=isReady(order);
+  const car=vehicle(order),owner=customer(car),quote=order.kind==='quote',ready=isReady(order),art=vehicleArtwork(car?.model);
   return `<article class="work-card ${ready?'ready':''}">
     <div class="card-top"><span class="pill ${quote?'blue':ready?'done':''}">${quote?'عرض سعر':ready?'جاهزة للتسليم':'داخل الورشة'}</span><span class="order-number" dir="ltr">${esc(order.number)}</span></div>
-    <div class="vehicle-heading"><div class="vehicle-emblem" aria-hidden="true">${icon('car')}</div><div><h2 class="car-name" dir="auto">${esc(car?.model)}</h2><span class="vehicle-subtitle">بطاقة صيانة</span></div></div>
+    <div class="vehicle-heading"><div class="vehicle-emblem" title="${esc(art.label)} — رسم توضيحي" aria-hidden="true"><img src="${esc(art.src)}" alt="" loading="lazy" decoding="async"></div><div><h2 class="car-name" dir="auto">${esc(car?.model)}</h2><span class="vehicle-subtitle">بطاقة صيانة</span></div></div>
     <div class="plate"><span class="plate-label">لوحة المركبة</span><bdi class="plate-number" dir="auto">${esc(car?.plate)}</bdi></div>
     <div class="card-info"><div class="info-item"><span class="info-label">العميل</span><p class="info-value customer-line">${esc(owner?.name)}</p></div><div class="info-item"><span class="info-label">الخدمة</span><p class="info-value service-description">${esc(order.description)}</p></div></div>
     ${quote?'':`<div class="card-actions">${!ready?`<button class="primary" data-status="${esc(order.id)}">${icon('check')}السيارة جاهزة</button>`:''}<button class="whatsapp" data-message="${ready?'ready':'received'}" data-order="${esc(order.id)}">${icon('chat')}${ready?'واتساب: السيارة جاهزة':'واتساب: تم الاستلام'}</button></div>`}
@@ -40,7 +45,7 @@ function orderCard(order){
   </article>`;
 }
 function render(){
-  const activeTab=['parts','finance','backup'].includes(page)?'more':page;
+  const activeTab=['parts','finance','backup','notifications'].includes(page)?'more':page;
   $('#nav').innerHTML=tabs.map(([target,i,title])=>`<button data-page="${target}" ${target===activeTab?'aria-current="page"':''} class="${target===activeTab?'active':''}">${icon(i)}<span>${title}</span></button>`).join('');
   const content=$('#content'),s=summary(state);
   if(page==='dashboard'){
@@ -56,7 +61,8 @@ function render(){
     const list=state.customers.filter(c=>[c.name,c.phone,...state.vehicles.filter(v=>v.customerId===c.id).map(v=>v.plate+' '+v.model)].join(' ').toLowerCase().includes(query.toLowerCase()));
     content.innerHTML=heading('عملاؤك وسياراتهم','بيانات العميل في مكان واحد.','customer','عميل جديد')+`<div class="toolbar">${searchField('اسم العميل، الهاتف أو اللوحة')}<button class="secondary" data-add="vehicle">إضافة سيارة</button></div><div class="customer-list">${list.map(c=>`<article class="customer-card"><h2>${esc(c.name)}</h2><p dir="ltr">${esc(c.phone)}</p>${state.vehicles.filter(v=>v.customerId===c.id).map(v=>`<div class="customer-vehicle"><div><b dir="auto">${esc(v.model)}</b><small>${esc(v.plate)}</small></div><button class="secondary" data-add="intake" data-vehicle="${esc(v.id)}">استلام السيارة</button></div>`).join('')||'<p class="hint">لم تسجّل سيارة لهذا العميل بعد.</p>'}</article>`).join('')||'<div class="empty-state">لم يُسجّل عميل بهذه البيانات.</div>'}</div>`;
   }
-  if(page==='more')content.innerHTML=heading('أدوات الكراج','افتح ما تحتاجه عندما تحتاجه.')+`<div class="more-grid"><button class="menu-card" data-page="parts">${icon('box')}<b>قطع الغيار والمخزون</b><span>الكميات وأسعار الشراء والبيع</span></button><button class="menu-card" data-page="finance">${icon('money')}<b>الحسابات والمصاريف</b><span>الربح، التحصيل والمصاريف</span></button><button class="menu-card" data-page="backup">${icon('backup')}<b>النسخ الاحتياطي</b><span>احفظ بياناتك أو انقلها لجهاز آخر</span></button></div><div class="panel help-panel"><h2>كيف تراسل العميل؟</h2><p>افتح بطاقة السيارة واضغط زر واتساب. راجع الرقم والرسالة، ثم افتح واتساب واضغط إرسال.</p><p class="hint">عند الضغط على «السيارة جاهزة» تظهر رسالة الجاهزية لتراجعها. لا يتم إرسال أي رسالة تلقائيًا.</p></div>`;
+  if(page==='more')content.innerHTML=heading('أدوات الكراج','افتح ما تحتاجه عندما تحتاجه.')+`<div class="more-grid"><button class="menu-card" data-page="notifications">${icon('chat')}<b>رسائل واتساب</b><span>اللغة وخيارات إشعار العميل</span></button><button class="menu-card" data-page="parts">${icon('box')}<b>قطع الغيار والمخزون</b><span>الكميات وأسعار الشراء والبيع</span></button><button class="menu-card" data-page="finance">${icon('money')}<b>الحسابات والمصاريف</b><span>الربح، التحصيل والمصاريف</span></button><button class="menu-card" data-page="backup">${icon('backup')}<b>النسخ الاحتياطي</b><span>احفظ بياناتك أو انقلها لجهاز آخر</span></button></div><div class="panel help-panel"><h2>كيف تراسل العميل؟</h2><p>افتح بطاقة السيارة واضغط زر واتساب. راجع الرقم والرسالة، ثم افتح واتساب واضغط إرسال.</p><p class="hint">عند الضغط على «السيارة جاهزة» تظهر رسالة الجاهزية لتراجعها. لا يتم إرسال أي رسالة تلقائيًا.</p></div>`;
+  if(page==='notifications')content.innerHTML=heading('إشعارات واتساب','جهّز رسالة العميل باللغة التي يفضّلها.')+`<section class="panel notification-settings"><h2>تفضيلات الرسائل</h2><label class="field">اللغة الافتراضية<select id="default-message-language"><option value="ar" ${preferences.language==='ar'?'selected':''}>العربية</option><option value="en" ${preferences.language==='en'?'selected':''}>English</option></select></label><label class="check-option"><input id="receipt-preview-default" type="checkbox" ${preferences.openReceiptAfterIntake?'checked':''}><span>افتح معاينة رسالة الاستلام بعد حفظ السيارة</span></label><p class="hint">يفتح رسالة جاهزة للمراجعة؛ تضغط إرسال بنفسك داخل واتساب.</p></section><section class="panel notification-settings"><div class="panel-head"><h2>الإرسال التلقائي</h2><span class="pill">غير متصل</span></div><p>إرسال الرسالة دون فتح واتساب يحتاج ربط رقم الكراج رسميًا بخدمة واتساب للأعمال وخادم إرسال آمن.</p><label class="check-option"><input id="auto-whatsapp-toggle" type="checkbox" disabled aria-describedby="auto-whatsapp-status"><span>إرسال رسالة تلقائيًا عند استلام السيارة</span></label><p id="auto-whatsapp-status" class="hint">لم يتم ربط خدمة إرسال. لا يتم إرسال أي رسالة تلقائيًا حاليًا.</p><details class="form-advanced"><summary>ما المطلوب لتفعيله؟</summary><p>حساب WhatsApp Business Platform برقم مفعّل، وقوالب رسائل عربية وإنجليزية معتمدة، وخادم يحفظ مفاتيح الربط بأمان. تطبيق واتساب على الهاتف وحده لا يفعّل هذه الخدمة.</p></details></section>`;
   if(page==='parts')content.innerHTML=heading('قطع الغيار','تابع المتوفر وأضف كميات جديدة.','part','قطعة جديدة')+`<section class="panel">${table(['القطعة','المتوفر','التكلفة','سعر البيع',''],state.parts.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td><span class="pill ${p.stock>5?'done':''}">${p.stock}</span></td><td>${cash(p.cost)}</td><td>${cash(p.price)}</td><td><button class="secondary" data-restock="${esc(p.id)}">إضافة كمية</button></td></tr>`))}</section>`;
   if(page==='finance')content.innerHTML=heading('حسابات الكراج','ملخص لجميع العمليات المسجلة بالدرهم.','expense','مصروف جديد')+`<div class="stats">${stat('الإيرادات',cash(s.revenue),'قبل الضريبة',true)}${stat('تكلفة القطع',cash(s.cost),'وقت إصدار الفاتورة')}${stat('المصاريف',cash(s.expenses),'مصاريف التشغيل')}${stat('الربح التقديري',cash(s.profit),'بعد تكلفة القطع والمصاريف')}</div><section class="panel"><div class="panel-head"><h2>المصاريف</h2><span>غير المحصّل: ${cash(s.unpaid)}</span></div>${table(['الوصف','المبلغ'],state.expenses.map(e=>`<tr><td>${esc(e.name)}</td><td>${cash(e.amount)}</td></tr>`))}<div class="finance-note">الربح = الفواتير قبل الضريبة − تكلفة القطع − المصاريف. عروض الأسعار مستبعدة. هذا ملخص تجريبي.</div></section>`;
   if(page==='backup')content.innerHTML=heading('احفظ نسخة من بياناتك','النسخة الاحتياطية تساعدك على استعادتها أو نقلها.')+`<section class="panel backup"><h2>بيانات هذا الجهاز</h2><p>بياناتك محفوظة في هذا المتصفح فقط. لا تنتقل تلقائيًا بين الآيفون والكمبيوتر، وحذف بيانات المتصفح يزيلها.</p><button id="export" class="primary">${icon('backup')}تنزيل نسخة احتياطية</button><label class="field">استعادة نسخة محفوظة<input id="import" type="file" accept="application/json,.json"></label><p class="hint">الاستعادة تستبدل البيانات الحالية بعد تأكيدك. احفظ ملف النسخة في مكان خاص.</p><details class="form-advanced"><summary>مسح البيانات</summary><p>صدّر نسخة أولًا إذا أردت الاحتفاظ بالبيانات.</p><button id="clear" class="secondary">مسح البيانات والبدء من جديد</button></details></section>`;
@@ -64,13 +70,16 @@ function render(){
 const field=(name,label,type='text',value='',extra='')=>`<label class="field">${label}<input required name="${name}" type="${type}" value="${esc(value)}" ${type==='number'?`min="0" step="${['qty','stock'].includes(name)?'1':'0.01'}"`:''} ${type==='tel'?'dir="ltr" inputmode="tel" placeholder="0501234567"':''} ${extra}></label>`;
 const select=(name,label,options,optional=false,emptyText='')=>`<label class="field">${label}<select name="${name}" ${optional?'':'required'}><option value="">${emptyText||(optional?'بدون قطعة':'اختر...')}</option>${options.map(([value,text])=>`<option value="${esc(value)}">${esc(text)}</option>`).join('')}</select></label>`;
 function charges(order){return field('labor','أجور العمل بالدرهم','number',order?.labor??'0')+select('partId','قطعة غيار',state.parts.map(p=>[p.id,`${p.name} (${p.stock} متوفر) — ${cash(p.price)}`]),true)+field('qty','كمية القطع','number',order?.qty??'0')+'<p class="hint">تُضاف ضريبة تجريبية ٥٪. بدون قطعة اترك الكمية صفرًا.</p>'}
+function vehiclePreviewMarkup(model){const art=vehicleArtwork(model);return `<img src="${esc(art.src)}" alt=""><div><b>${esc(art.label)}</b><small>${art.id==='generic'?'اكتب الشركة والموديل لإظهار شكل أقرب.':'رسم توضيحي حسب الاسم، وليس صورة لسنة تصنيع محددة.'}</small></div>`}
+function modelField(label){return field('model',label)+`<div id="vehicle-preview" class="vehicle-preview">${vehiclePreviewMarkup('')}</div>`}
+function notificationFields(){return `<div class="form-section notification-options"><label class="field">لغة رسالة العميل<select name="messageLanguage"><option value="ar">العربية</option><option value="en">English</option></select></label><label class="check-option"><input type="checkbox" name="previewReceipt" value="yes" ${preferences.openReceiptAfterIntake?'checked':''}><span>اعرض رسالة الاستلام بعد الحفظ</span></label><p class="hint">هذا يفتح المعاينة فقط. الإرسال يتم من واتساب بعد مراجعتك.</p></div>`}
 function open(kind,options={}){
   $('#error').textContent='';let html='',title='',button='حفظ البيانات',afterSave;
   if(kind==='intake'){
     title='استلام سيارة';button='حفظ الاستلام';
     html='<p class="hint">سجّل العميل والسيارة في خطوة واحدة.</p>'+select('vehicleId','سيارة مسجلة سابقًا',state.vehicles.map(v=>[v.id,`${v.plate} — ${customer(v)?.name}`]),true,'عميل أو سيارة جديدة')+
-      `<div id="new-car-fields">${select('customerId','العميل',state.customers.map(c=>[c.id,c.name]),true,'عميل جديد')}<div id="new-customer-fields">${field('name','اسم العميل')}${field('phone','رقم واتساب العميل','tel')}</div>${field('model','السيارة (الشركة والموديل)')}${field('plate','رقم اللوحة والإمارة')}</div>`+
-      field('description','سبب الزيارة / الخدمة')+`<details class="form-advanced"><summary>التكلفة وقطع الغيار (اختياري الآن)</summary>${charges()}</details>`;
+      `<div id="new-car-fields">${select('customerId','العميل',state.customers.map(c=>[c.id,c.name]),true,'عميل جديد')}<div id="new-customer-fields">${field('name','اسم العميل')}${field('phone','رقم واتساب العميل','tel')}</div>${modelField('السيارة (الشركة والموديل)')}${field('plate','رقم اللوحة والإمارة')}</div>`+
+      field('description','سبب الزيارة / الخدمة')+`<details class="form-advanced"><summary>التكلفة وقطع الغيار (اختياري الآن)</summary>${charges()}</details>`+notificationFields();
     submit=(s,d)=>{
       let vehicleId=d.vehicleId;
       if(!vehicleId){
@@ -81,10 +90,10 @@ function open(kind,options={}){
       }
       return createOrder(s,{...d,vehicleId,kind:'invoice'});
     };
-    afterSave=()=>{page='dashboard';workFilter='active';query='';render();toast('تم استلام السيارة. يمكنك إرسال إشعار واتساب من بطاقتها.')};
+    afterSave=(order,data)=>{page='dashboard';workFilter='active';query='';render();toast('تم استلام السيارة.');if(data.previewReceipt==='yes')openMessage(order.id,'received')};
   }
   if(kind==='customer'){title='عميل جديد';html=field('name','اسم العميل')+field('phone','رقم واتساب العميل','tel');submit=(s,d)=>s.customers.push({id:id(),name:d.name.trim(),phone:'+'+normalizeWhatsAppPhone(d.phone)})}
-  if(kind==='vehicle'){if(!state.customers.length)return toast('سجّل عميلًا أولًا، أو استخدم «استلام سيارة».');title='إضافة سيارة';html=select('customerId','العميل',state.customers.map(c=>[c.id,c.name]))+field('model','الشركة والموديل وسنة الصنع')+field('plate','رقم اللوحة والإمارة');submit=(s,d)=>{if(s.vehicles.some(v=>v.plate.trim().toLowerCase()===d.plate.trim().toLowerCase()))throw Error('اللوحة مسجلة مسبقًا');s.vehicles.push({id:id(),customerId:d.customerId,model:d.model.trim(),plate:d.plate.trim()})}}
+  if(kind==='vehicle'){if(!state.customers.length)return toast('سجّل عميلًا أولًا، أو استخدم «استلام سيارة».');title='إضافة سيارة';html=select('customerId','العميل',state.customers.map(c=>[c.id,c.name]))+modelField('الشركة والموديل وسنة الصنع')+field('plate','رقم اللوحة والإمارة');submit=(s,d)=>{if(s.vehicles.some(v=>v.plate.trim().toLowerCase()===d.plate.trim().toLowerCase()))throw Error('اللوحة مسجلة مسبقًا');s.vehicles.push({id:id(),customerId:d.customerId,model:d.model.trim(),plate:d.plate.trim()})}}
   if(kind==='part'){title='قطعة غيار جديدة';html=field('name','اسم القطعة / Part name')+field('stock','الكمية','number','0')+field('cost','تكلفة الشراء للوحدة','number')+field('price','سعر البيع للوحدة','number');submit=(s,d)=>{if(!Number.isInteger(Number(d.stock)))throw Error('الكمية يجب أن تكون عددًا صحيحًا');s.parts.push({id:id(),name:d.name.trim(),stock:amount(d.stock),cost:amount(d.cost),price:amount(d.price)})}}
   if(kind==='restock'){title='إضافة كمية للمخزون';html=field('qty','الكمية الجديدة','number','1');submit=(s,d)=>{if(!Number.isInteger(+d.qty)||+d.qty<1)throw Error('أدخل عددًا صحيحًا موجبًا');s.parts.find(p=>p.id===options.partId).stock+=+d.qty}}
   if(kind==='expense'){title='مصروف جديد';html=field('name','وصف المصروف')+field('amount','المبلغ بالدرهم','number');submit=(s,d)=>s.expenses.push({id:id(),name:d.name.trim(),amount:amount(d.amount)})}
@@ -98,6 +107,7 @@ function open(kind,options={}){
   }
   $('#dialog-title').textContent=title;$('#fields').innerHTML=html;$('#save-button').textContent=button;$('#form').afterSave=afterSave;
   if(kind==='edit')$('#fields [name="partId"]').value=state.orders.find(o=>o.id===options.orderId).partId;
+  if(kind==='intake')$('#fields [name="messageLanguage"]').value=preferences.language;
   if(kind==='intake'){if(options.vehicleId)$('#fields [name="vehicleId"]').value=options.vehicleId;syncIntake()}
   $('#dialog').showModal();
 }
@@ -112,11 +122,17 @@ function openMessage(orderId,kind){
   const order=state.orders.find(o=>o.id===orderId);if(!order||order.kind!=='invoice')return;
   if(kind==='ready'&&!isReady(order))return toast('حدّد أن السيارة جاهزة أولًا.');
   const car=vehicle(order),owner=customer(car);
+  messageContext={kind,customerName:owner?.name,model:car?.model,plate:car?.plate,orderNumber:order.number};
+  messageDrafts={ar:serviceMessage({...messageContext,language:'ar'}),en:serviceMessage({...messageContext,language:'en'})};
+  messageLanguage=order.messageLanguage||preferences.language;
   $('#message-title').textContent=kind==='ready'?'إشعار جاهزية السيارة':'إشعار استلام السيارة';
   $('#message-customer').textContent=owner?.name||'العميل';$('#wa-phone').value=owner?.phone||'';
-  $('#wa-text').value=serviceMessage({kind,customerName:owner?.name,model:car?.model,plate:car?.plate,orderNumber:order.number});
+  $('#message-language').value=messageLanguage;
+  $('#wa-text').value=messageDrafts[messageLanguage];$('#wa-text').dir=messageLanguage==='en'?'ltr':'rtl';$('#wa-text').lang=messageLanguage;
   updateMessageLink();$('#message-dialog').showModal();
 }
+function switchMessageLanguage(language){if(!['ar','en'].includes(language)||!messageContext)return;messageDrafts[messageLanguage]=$('#wa-text').value;messageLanguage=language;$('#wa-text').value=messageDrafts[language];$('#wa-text').dir=language==='en'?'ltr':'rtl';$('#wa-text').lang=language;savePreferences({language});updateMessageLink()}
+
 function updateMessageLink(){
   const link=$('#wa-send');
   try{const text=$('#wa-text').value.trim();if(!text)throw Error('اكتب نص الرسالة.');link.href=buildWhatsAppUrl($('#wa-phone').value,text);link.removeAttribute('aria-disabled');$('#message-error').textContent=''}
@@ -126,7 +142,7 @@ $('#form').addEventListener('submit',event=>{
   event.preventDefault();try{
     const data=Object.fromEntries(new FormData(event.target));
     if(Object.values(data).some(value=>typeof value==='string'&&value!==''&&!value.trim()))throw Error('أدخل بيانات صحيحة');
-    const next=structuredClone(state);submit(next,data);save(next);$('#dialog').close();toast('تم الحفظ');$('#form').afterSave?.();
+    const next=structuredClone(state);const result=submit(next,data);save(next);$('#dialog').close();toast('تم الحفظ');$('#form').afterSave?.(result,data);
   }catch(error){$('#error').textContent=error.message}
 });
 $('#close').onclick=()=>$('#dialog').close();$('#message-close').onclick=()=>$('#message-dialog').close();
@@ -151,10 +167,14 @@ document.addEventListener('click',event=>{
   if(button.id==='clear'&&confirm('هل صدّرت نسخة؟ سيتم مسح جميع البيانات المحلية.'))mutate(s=>Object.assign(s,empty()));
 });
 document.addEventListener('input',event=>{
+  if(event.target.name==='model'&&$('#vehicle-preview'))$('#vehicle-preview').innerHTML=vehiclePreviewMarkup(event.target.value);
   if(event.target.id==='search'){const pos=event.target.selectionStart;query=event.target.value;render();$('#search').focus();if(typeof pos==='number')$('#search').setSelectionRange(pos,pos)}
   if(['wa-phone','wa-text'].includes(event.target.id))updateMessageLink();
 });
 document.addEventListener('change',async event=>{
+  if(event.target.id==='message-language')switchMessageLanguage(event.target.value);
+  if(event.target.id==='default-message-language')savePreferences({language:event.target.value});
+  if(event.target.id==='receipt-preview-default')savePreferences({openReceiptAfterIntake:event.target.checked});
   if(['vehicleId','customerId'].includes(event.target.name))syncIntake();
   if(event.target.id!=='import')return;
   const file=event.target.files[0];if(!file)return;
