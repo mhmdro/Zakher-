@@ -5,6 +5,7 @@ const {tmpdir}=require('node:os');
 const {join}=require('node:path');
 
 const storageKey='zakher-garage-v1';
+const baseURL=process.env.BASE_URL || 'http://127.0.0.1:3000';
 // This is the pre-redesign storage shape: loading it must not reset user data.
 const legacy={
   customers:[{id:'legacy-customer',name:'عميل محفوظ سابقًا',phone:'0501234567'}],
@@ -25,16 +26,22 @@ const legacy={
     await context.addInitScript(({key,fixture})=>{
       if(localStorage.getItem(key)===null)localStorage.setItem(key,JSON.stringify(fixture));
     },{key:storageKey,fixture:legacy});
-    let externalRequests=0;
-    // Never open WhatsApp, navigate to wa.me, or send a notification during tests.
-    await context.route('https://wa.me/**',route=>{externalRequests++;return route.abort()});
+    let externalRequests=0,sendRequests=0;
+    // Block external destinations and any send-style requests, even if a UI regresses.
+    await context.route('**/*',route=>{
+      const request=route.request(),url=request.url();
+      if(!/^https?:/.test(url))return route.continue();
+      if(new URL(url).origin!==new URL(baseURL).origin){externalRequests++;return route.abort()}
+      if(!['GET','HEAD'].includes(request.method())){sendRequests++;return route.abort()}
+      return route.continue();
+    });
     const p=await context.newPage(),errors=[];
     p.on('pageerror',error=>errors.push(error.message));
-    await p.goto(process.env.BASE_URL || 'http://127.0.0.1:3000');
+    await p.goto(baseURL);
     await p.waitForSelector('h1');
     const data=()=>p.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     const nav=async target=>{
-      if(['parts','finance','backup'].includes(target))await p.locator('#nav [data-page="more"]').click();
+      if(['parts','finance','backup','notifications'].includes(target))await p.locator('#nav [data-page="more"]').click();
       await p.locator(`[data-page="${target}"]`).first().click();
     };
     const card=id=>p.locator('article.work-card').filter({has:p.locator(`[data-print="${id}"]`)});
@@ -53,8 +60,22 @@ const legacy={
       await p.locator('#form button[type="submit"]').click();
       await p.waitForFunction(()=>!document.querySelector('#dialog').open);
     };
+    const assertVehiclePreview=async()=>{
+      const model=p.locator('#form [name="model"]'),preview=p.locator('#vehicle-preview');
+      await model.fill('Toyota Land Cruiser 2022');
+      assert((await preview.locator('img').getAttribute('src')).endsWith('/suv-large.svg'));
+      assert((await preview.locator('b').textContent()).includes('Toyota Land Cruiser'));
+      await p.waitForFunction(()=>{const image=document.querySelector('#vehicle-preview img');return image?.complete&&image.naturalWidth>0});
+      const suvSource=await preview.locator('img').getAttribute('src');
+      await model.fill('Toyota Camry 2024');
+      assert((await preview.locator('img').getAttribute('src')).endsWith('/sedan-camry.svg'));
+      assert.notEqual(await preview.locator('img').getAttribute('src'),suvSource,'Changing model changes the visible vehicle illustration');
+      assert((await preview.locator('b').textContent()).includes('Toyota Camry'));
+      await p.waitForFunction(()=>{const image=document.querySelector('#vehicle-preview img');return image?.complete&&image.naturalWidth>0});
+    };
     const add=async(kind,values)=>{
       await p.locator(`[data-add="${kind}"]`).first().click();
+      if(['intake','vehicle'].includes(kind)&&values.model)await assertVehiclePreview();
       if(['labor','partId','qty'].some(name=>Object.hasOwn(values,name))&&await p.locator('#form details.form-advanced').count()){
         await p.locator('#form details.form-advanced > summary').click();
       }
@@ -77,7 +98,10 @@ const legacy={
     await card('legacy-order').locator('[data-message="received"]').click();
     assert.equal(await p.locator('#message-customer').textContent(),'عميل محفوظ سابقًا');
     assert.equal(await p.locator('#wa-phone').inputValue(),'0501234567');
+    assert.equal(await p.locator('#message-language').inputValue(),'ar');
+    assert.equal(await p.locator('#wa-text').getAttribute('dir'),'rtl');
     const receipt=await p.locator('#wa-text').inputValue();
+    assert(receipt.includes('👋'));assert(receipt.includes('🧾'));assert(receipt.includes('\n\n'));
     for(const text of ['تم استلام سيارتك','Legacy Toyota 2022','أبوظبي 12345','INV-1001'])assert(receipt.includes(text));
     let link=new URL(await p.locator('#wa-send').getAttribute('href'));
     assert.equal(link.pathname,'/971501234567');assert.equal(link.searchParams.get('text'),receipt);
@@ -94,6 +118,18 @@ const legacy={
     link=new URL(await p.locator('#wa-send').getAttribute('href'));
     assert.equal(link.pathname,'/447700900123');assert.equal(link.searchParams.get('text'),edited);
     assert.equal([...link.searchParams].length,1,'Message ampersands cannot create extra query parameters');
+    // Switching languages keeps each edited draft, updates direction and never mutates order data.
+    await p.locator('#message-language').selectOption('en');
+    assert.equal(await p.locator('#wa-text').getAttribute('dir'),'ltr');
+    const englishReceipt=await p.locator('#wa-text').inputValue();
+    for(const text of ['Zakher Garage',"We've received your vehicle",'Plate: أبوظبي 12345','Service order: INV-1001','👋'])assert(englishReceipt.includes(text));
+    const englishDraft='Hello & welcome 👋\nYour vehicle is with Zakher Garage.';
+    await p.locator('#wa-text').fill(englishDraft);
+    await p.locator('#message-language').selectOption('ar');
+    assert.equal(await p.locator('#wa-text').inputValue(),edited);assert.equal(await p.locator('#wa-text').getAttribute('dir'),'rtl');
+    await p.locator('#message-language').selectOption('en');assert.equal(await p.locator('#wa-text').inputValue(),englishDraft);
+    link=new URL(await p.locator('#wa-send').getAttribute('href'));assert.equal(link.searchParams.get('text'),englishDraft);
+    await p.locator('#message-language').selectOption('ar');assert.equal(await p.locator('#wa-text').inputValue(),edited);
     await p.locator('#wa-text').fill('   ');assert.equal(await p.locator('#wa-send').getAttribute('href'),null);
     await closeMessage();assert.deepEqual(await data(),legacy,'Preview edits must not mutate saved contact/order data');
 
@@ -112,13 +148,16 @@ const legacy={
     await p.locator('[data-filter="active"]').click();
 
     // One form creates a new customer, car and maintenance order without finances.
-    await add('intake',{name:'عميل استلام جديد',phone:'٠٥٠١١١٢٢٣٣',model:'Intake Car 2026',plate:'TEST 100',description:'فحص أولي / Initial inspection'});
+    await add('intake',{name:'عميل استلام جديد',phone:'٠٥٠١١١٢٢٣٣',model:'Intake Car 2026',plate:'TEST 100',description:'فحص أولي / Initial inspection',messageLanguage:'en'});
     saved=await data();assert.equal(saved.customers.length,2);assert.equal(saved.vehicles.length,2);assert.equal(saved.orders.length,2);
     const cid=saved.customers.at(-1).id,vid=saved.vehicles.at(-1).id,intakeId=saved.orders.at(-1).id;
     assert.equal(saved.customers.at(-1).phone,'+971501112233');assert.equal(saved.orders.at(-1).total,0);
+    assert.equal(saved.orders.at(-1).messageLanguage,'en');
     assert.equal(saved.orders.at(-1).vehicleId,vid);assert.equal(saved.vehicles.at(-1).customerId,cid);
     await card(intakeId).locator('[data-message="received"]').click();
-    assert.equal(new URL(await p.locator('#wa-send').getAttribute('href')).pathname,'/971501112233');await closeMessage();
+    assert.equal(new URL(await p.locator('#wa-send').getAttribute('href')).pathname,'/971501112233');
+    assert.equal(await p.locator('#message-language').inputValue(),'en');assert.equal(await p.locator('#wa-text').getAttribute('dir'),'ltr');
+    assert((await p.locator('#wa-text').inputValue()).includes("We've received your vehicle"));await closeMessage();
 
     // A new car can belong to an existing customer, without duplicate contacts.
     await add('intake',{customerId:'legacy-customer',model:'Another Car',plate:'TEST 200',description:'فحص سيارة ثانية'});
@@ -142,6 +181,7 @@ const legacy={
     const returning=p.locator(`[data-add="intake"][data-vehicle="${vid}"]`);
     await returning.click();assert.equal(await p.locator('#form [name="vehicleId"]').inputValue(),vid);
     assert(await p.locator('#form [name="name"]').isDisabled());await p.locator('#close').click();
+    await p.locator('[data-add="vehicle"]').first().click();await assertVehiclePreview();await p.locator('#close').click();
 
     await nav('parts');await add('part',{name:'Test part',stock:'3',cost:'10',price:'25'});
     const pid=(await data()).parts.at(-1).id;
@@ -175,6 +215,7 @@ const legacy={
     saved=await data();assert.equal(saved.parts.at(-1).stock,1);
     assert(saved.orders.find(order=>order.id===oid).paid);assert.equal(saved.orders.find(order=>order.id===oid).status,'مكتمل');
     assert.equal(saved.orders.find(order=>order.id===oid).cost,20);
+    assert.equal(saved.orders.find(order=>order.id===intakeId).messageLanguage,'en','Intake language survives reload');
 
     await nav('finance');await add('expense',{name:'Test expense',amount:'20'});
     assert((await p.locator('.stat').nth(0).textContent()).includes('275.00'));
@@ -199,17 +240,54 @@ const legacy={
     await p.waitForFunction(()=>document.querySelector('#toast').textContent==='تمت استعادة النسخة');
     assert.equal(confirmations,1);assert.deepEqual(await data(),beforeBackup);
 
+    // Preferences are separate from garage records; preview automation is not sending automation.
+    const beforePreferences=await data();await nav('notifications');
+    assert(await p.locator('#auto-whatsapp-toggle').isDisabled());
+    assert.equal(await p.locator('#auto-whatsapp-toggle').isChecked(),false);
+    assert((await p.locator('#auto-whatsapp-status').textContent()).includes('لا يتم إرسال أي رسالة تلقائيًا'));
+    assert((await p.locator('#content').textContent()).includes('غير متصل'));
+    await p.locator('#default-message-language').selectOption('en');await p.locator('#receipt-preview-default').check();
+    assert.deepEqual(await data(),beforePreferences,'Changing preferences must not modify garage data');
+    await p.reload();await p.waitForSelector('h1');await nav('notifications');
+    assert.equal(await p.locator('#default-message-language').inputValue(),'en');
+    assert(await p.locator('#receipt-preview-default').isChecked());
+    assert.deepEqual(await data(),beforePreferences,'Preferences survive reload independently of garage data');
+    await nav('dashboard');await card('legacy-order').locator('[data-message="received"]').click();
+    assert.equal(await p.locator('#message-language').inputValue(),'en','Legacy orders without language use the saved default');
+    assert((await p.locator('#wa-text').inputValue()).includes("We've received your vehicle"));
+    await closeMessage();assert(!Object.hasOwn((await data()).orders[0],'messageLanguage'));
+    await p.locator('[data-add="intake"]').first().click();
+    assert.equal(await p.locator('#form [name="messageLanguage"]').inputValue(),'en');
+    assert(await p.locator('#form [name="previewReceipt"]').isChecked());
+    await fillForm({vehicleId:vid,description:'English default receipt preview'});await saveForm();
+    await p.waitForSelector('#message-dialog[open]');
+    saved=await data();const automaticPreviewOrder=saved.orders.at(-1);
+    assert.equal(automaticPreviewOrder.messageLanguage,'en');assert.equal(automaticPreviewOrder.vehicleId,vid);
+    assert.equal(await p.locator('#message-language').inputValue(),'en');
+    assert.equal(await p.locator('#wa-text').getAttribute('dir'),'ltr');
+    assert((await p.locator('#wa-text').inputValue()).includes("We've received your vehicle"));
+    assert.equal(externalRequests,0);assert.equal(sendRequests,0);await closeMessage();
+    await card(automaticPreviewOrder.id).locator(`[data-status="${automaticPreviewOrder.id}"]`).click();
+    await p.waitForSelector('#message-dialog[open]');
+    assert.equal(await p.locator('#message-language').inputValue(),'en');
+    assert((await p.locator('#wa-text').inputValue()).includes('ready for collection'));await closeMessage();
+    // The operator can suppress the preview for one intake even when the default is enabled.
+    await p.locator('[data-add="intake"]').first().click();await p.locator('#form [name="previewReceipt"]').uncheck();
+    await fillForm({vehicleId:vid,description:'Intake without a preview'});await saveForm();
+    assert.equal(await p.locator('#message-dialog').evaluate(element=>element.open),false);
+
     await p.setViewportSize({width:390,height:844});await nav('dashboard');await noOverflow('workshop at 390px');
     await p.screenshot({path:'/tmp/zakher-mobile.png',fullPage:true});
     await card(intakeId).locator('[data-message="received"]').click();await noOverflow('WhatsApp preview at 390px');
     assert(await p.locator('#wa-send').isVisible());await closeMessage();
-    for(const target of ['customers','orders','more','finance','parts','backup']){await nav(target);await noOverflow(target+' at 390px')}
+    for(const target of ['customers','orders','more','finance','parts','backup','notifications']){await nav(target);await noOverflow(target+' at 390px')}
     await p.setViewportSize({width:1440,height:1000});await nav('dashboard');
     await p.screenshot({path:'/tmp/zakher-desktop.png',fullPage:true});
-    assert.equal(externalRequests,0,'Tests must never open an external WhatsApp link');
+    assert.equal(externalRequests,0,'Tests must never open external destinations, including WhatsApp');
+    assert.equal(sendRequests,0,'Static demo must not attempt backend sends');
     assert.equal(context.pages().length,1,'No WhatsApp popup should be opened');
     assert.deepEqual(errors,[],'No JavaScript errors');
-    console.log('PASS: legacy-data preservation; new/existing/returning intake; receipt/ready previews and phone validation; no WhatsApp sends; invoice editing/atomic stock validation/paid edit protection; inventory/VAT/cost/payment; quote; profit; bilingual print; export/change/import; 390px pages/dialog; no JS errors');
+    console.log('PASS: legacy-data preservation; new/existing/returning intake; bilingual emoji templates, edited drafts, preferences and optional auto-receipt preview; dynamic car art; receipt/ready previews and phone validation; no WhatsApp sends; invoice editing/atomic stock validation/paid edit protection; inventory/VAT/cost/payment; quote; profit; bilingual print; export/change/import; 390px pages/dialog; no JS errors');
   } finally {
     await context?.close();await browser?.close();if(temp)await rm(temp,{recursive:true,force:true});
   }

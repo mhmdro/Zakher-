@@ -83,3 +83,81 @@ test('quote updates preserve snapshots, exclude revenue and never change stock',
  assert.deepEqual(s.parts.map(p=>p.stock),stocks);assert.deepEqual(summary(s),financial);
  updateOrder(s,o.id,{partId:'',qty:0});assert.equal(o.total,10.5);assert.deepEqual(s.parts.map(p=>p.stock),stocks);
 });
+
+test('Arabic WhatsApp templates use clear paragraphs and separate labelled vehicle details',()=>{
+ const details={customerName:'أحمد',model:'Toyota Land Cruiser',plate:'أبوظبي 12345',orderNumber:'INV-1002'};
+ for(const kind of ['received','ready']){
+  const text=serviceMessage({...details,kind});
+  assert.equal(text,serviceMessage({...details,kind,language:'ar'}),'Arabic remains the default language');
+  assert(text.startsWith('مرحبًا أحمد 👋\n\n'));
+  assert(text.includes('*كراج زاخر لصيانة السيارات*\n\n'));
+  assert(text.includes('🚘 السيارة: Toyota Land Cruiser\n📍 رقم اللوحة: أبوظبي 12345\n🧾 رقم أمر الصيانة: INV-1002'));
+  assert(text.endsWith('💙 شكرًا لثقتك بنا.'));
+ }
+ assert(serviceMessage({...details,kind:'received'}).includes('🔧 تم استلام سيارتك للصيانة.'));
+ assert(serviceMessage({...details,kind:'ready'}).includes('✅ اكتملت صيانة سيارتك وهي جاهزة للاستلام.'));
+});
+
+test('English service messages preserve names and identify receipt versus collection readiness',()=>{
+ const details={customerName:'أحمد Smith',model:'تويوتا Land Cruiser',plate:'أبوظبي 12345',orderNumber:'INV-1002',language:'en'};
+ const received=serviceMessage({...details,kind:'received'}),ready=serviceMessage({...details,kind:'ready'});
+ for(const text of [received,ready]){
+  assert(text.startsWith('Hello أحمد Smith 👋\n\n'));
+  assert(text.includes('*Zakher Garage · Auto Maintenance*'));
+  assert(text.includes('🚘 Vehicle: تويوتا Land Cruiser\n📍 Plate: أبوظبي 12345\n🧾 Service order: INV-1002'));
+  assert(!/paid|delivered|https?:\/\//i.test(text));
+ }
+ assert(received.includes("We've received your vehicle for service."));
+ assert(received.includes("We'll notify you when it's ready for collection."));
+ assert(ready.includes("Your vehicle's service is complete and it's ready for collection."));
+ assert(!ready.includes("We've received"));assert(!ready.includes("We'll notify"));
+});
+
+test('service messages reject unsupported languages and omit unavailable detail labels',()=>{
+ for(const language of ['fr','AR','',null])assert.throws(()=>serviceMessage({kind:'received',language}),/العربية أو الإنجليزية/);
+ for(const language of ['ar','en']){
+  const text=serviceMessage({kind:'received',language,customerName:' ',model:null,plate:undefined,orderNumber:''});
+  assert(!/undefined|null/.test(text));
+  for(const label of ['السيارة:','رقم اللوحة:','رقم أمر الصيانة:','Vehicle:','Plate:','Service order:'])assert(!text.includes(label));
+  assert(text.includes(language==='ar'?'مرحبًا عميلنا العزيز':'Hello valued customer'));
+ }
+});
+
+test('WhatsApp URLs round-trip multilingual service templates with emoji and paragraphs',()=>{
+ for(const language of ['ar','en']){
+  const text=serviceMessage({kind:'ready',language,customerName:'أحمد & Smith',model:'Toyota 🚘',plate:'أ 123',orderNumber:'INV-1002'});
+  const link=buildWhatsAppUrl('0501234567',text),parsed=new URL(link);
+  assert.equal(parsed.origin,'https://wa.me');assert.equal(parsed.pathname,'/971501234567');
+  assert.equal(parsed.searchParams.get('text'),text);assert.equal([...parsed.searchParams].length,1);
+  assert(link.includes(encodeURIComponent('👋')));assert(link.includes(encodeURIComponent('✅')));
+  assert(link.includes('%0A%0A'));assert(!link.includes('& Smith'));
+ }
+});
+
+test('order message language is optional, validated before mutation and preserved during pricing edits',()=>{
+ const s=demo();assert(!Object.hasOwn(s.orders[0],'messageLanguage'),'Legacy creation must not gain a schema key');
+ const unspecified=createOrder(s,{vehicleId:'v1',description:'Old client',kind:'invoice',labor:0,messageLanguage:undefined});
+ assert(!Object.hasOwn(unspecified,'messageLanguage'));
+ for(const messageLanguage of ['ar','en']){
+  const order=createOrder(s,{vehicleId:'v1',description:'New intake',kind:'invoice',labor:0,messageLanguage});
+  assert.equal(order.messageLanguage,messageLanguage);
+  updateOrder(s,order.id,{labor:10});assert.equal(order.messageLanguage,messageLanguage);
+ }
+ for(const messageLanguage of ['fr','',null,1]){
+  const before=structuredClone(s);
+  assert.throws(()=>createOrder(s,{vehicleId:'v1',description:'Bad language',kind:'invoice',labor:100,partId:'p1',qty:1,messageLanguage}),/العربية أو الإنجليزية/);
+  assert.deepEqual(s,before,'Bad language cannot deduct stock or append an order');
+ }
+});
+
+test('backup accepts legacy absent language and valid optional preferences but rejects malformed values',()=>{
+ const s=demo();assert.deepEqual(validateBackup(structuredClone(s)),s);
+ for(const messageLanguage of ['ar','en']){
+  const copy=structuredClone(s);copy.orders[0].messageLanguage=messageLanguage;
+  assert.equal(validateBackup(copy).orders[0].messageLanguage,messageLanguage);
+ }
+ for(const messageLanguage of ['fr','',null,undefined,0]){
+  const copy=structuredClone(s);copy.orders[0].messageLanguage=messageLanguage;
+  assert.throws(()=>validateBackup(copy),/لغة رسالة المستند غير صالحة/);
+ }
+});

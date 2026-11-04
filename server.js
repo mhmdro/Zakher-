@@ -2,13 +2,22 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 
 const allowedFiles = [
-  'app.js', 'style.css', 'domain.js',
+  'app.js', 'style.css', 'domain.js', 'vehicle-art.js',
   'assets/fonts/tajawal-arabic-400-normal.woff2',
   'assets/fonts/tajawal-arabic-500-normal.woff2',
   'assets/fonts/tajawal-arabic-700-normal.woff2',
   'assets/fonts/tajawal-latin-400-normal.woff2',
   'assets/fonts/tajawal-latin-500-normal.woff2',
   'assets/fonts/tajawal-latin-700-normal.woff2',
+  'assets/vehicles/generic.svg',
+  'assets/vehicles/pickup.svg',
+  'assets/vehicles/sedan-altima.svg',
+  'assets/vehicles/sedan-camry.svg',
+  'assets/vehicles/sedan-compact.svg',
+  'assets/vehicles/sedan-luxury.svg',
+  'assets/vehicles/sedan-sport.svg',
+  'assets/vehicles/suv-crossover.svg',
+  'assets/vehicles/suv-large.svg',
   'assets/fonts/OFL.txt',
   'assets/fonts/README.md',
 ];
@@ -21,6 +30,7 @@ const types = {
   js: 'text/javascript; charset=utf-8',
   css: 'text/css; charset=utf-8',
   woff2: 'font/woff2',
+  svg: 'image/svg+xml',
   txt: 'text/plain; charset=utf-8',
   md: 'text/plain; charset=utf-8',
 };

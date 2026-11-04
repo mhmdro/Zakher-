@@ -372,3 +372,22 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;paddin
  #print-area td,#print-area th{font-size:13px}
  #print-area .totals{margin-top:25px;line-height:2.5;text-align:end}
 }
+
+/* Vehicle illustrations and message preferences. */
+.vehicle-emblem{width:74px;height:74px;padding:3px;background:#faf9f5}
+.vehicle-emblem img{display:block;width:100%;height:100%;object-fit:contain}
+.vehicle-preview{display:flex;align-items:center;gap:14px;min-width:0;margin:-4px 0 20px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:#faf9f5}
+.vehicle-preview img{width:92px;height:72px;flex-shrink:0;object-fit:contain}
+.vehicle-preview>div{min-width:0}
+.vehicle-preview b{display:block;font-size:14px;line-height:1.7}
+.vehicle-preview small{display:block;margin-top:4px;font-size:12px;color:var(--muted);line-height:1.7}
+.notification-settings{padding:23px}
+.notification-settings>h2{margin-bottom:20px}
+.notification-settings>.panel-head{padding:0 0 16px;margin-bottom:14px}
+.notification-settings p{font-size:14px;color:var(--muted);line-height:1.9}
+.notification-options{border-top:1px solid var(--line);padding-top:18px}
+.check-option{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:8px 0;font-size:14px;line-height:1.7;cursor:pointer}
+.check-option input[type=checkbox]{appearance:auto;width:19px;height:19px;min-height:19px;flex:0 0 19px;margin:3px 0 0;padding:0;accent-color:var(--navy)}
+.check-option:has(input:disabled){color:var(--muted);cursor:not-allowed}
+#message-language{max-width:100%}
+@media(max-width:760px){.vehicle-emblem{width:68px;height:68px}.vehicle-preview{gap:9px;padding:9px}.vehicle-preview img{width:78px;height:65px}.vehicle-preview b{font-size:13px}.notification-settings{padding:18px}}
