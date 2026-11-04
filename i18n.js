@@ -281,6 +281,9 @@ const english=Object.freeze({
  "الدفعة أكبر من المبلغ المتبقي.":"The payment exceeds the remaining balance.",
  "راتب: {name} — {month}":"Salary: {name} — {month}",
  "بيانات الدفعات أو العمال أو الرواتب أو التذكيرات غير صالحة.":"Invalid payment, staff, payroll or reminder data.",
+ 'بيانات العميل':'Customer details',
+ 'بيانات السيارة':'Vehicle details',
+ 'مختوم إلكترونياً':'Electronically stamped',
 });
 
 export function translate(text,vars={},language='ar') {

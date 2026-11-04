@@ -362,16 +362,70 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;paddin
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 @media print{
- body{padding:0;background:#fff;color:#000}
+ @page{size:A4;margin:14mm}
+ body{padding:0;background:#fff;color:#172d4b}
  body>*{display:none!important}
- #print-area{display:block!important;padding:25px;color:#111}
- #print-area table{white-space:normal}
- #print-area h1{font-size:30px}
- #print-area .print-head{display:flex;justify-content:space-between;gap:25px;padding-bottom:25px;border-bottom:3px solid #142331}
- #print-area p{line-height:2}
- #print-area td,#print-area th{font-size:13px}
- #print-area .totals{margin-top:25px;line-height:2.5;text-align:end}
+ #print-area{display:block!important;padding:0;color:#172d4b;font-size:13px;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* A4 stationery shared by quotations and invoices. */
+#print-area{--document-blue:#145fc3;--document-deep:#103f81;--document-light:#eef5ff;--document-line:#d8e5f5}
+#print-area .document-sheet{min-height:265mm}
+#print-area h1,#print-area h2,#print-area h3,#print-area p,#print-area dl,#print-area dd{margin:0}
+#print-area .print-head{display:flex;justify-content:space-between;align-items:flex-start;gap:7mm;padding:2mm 0 5mm;border-top:2mm solid var(--document-blue);border-bottom:.4mm solid var(--document-line);break-inside:avoid}
+#print-area .document-brand{display:flex;align-items:center;gap:4mm;min-width:0;padding-top:4mm}
+#print-area .document-brand-mark{display:grid;place-items:center;flex-shrink:0;width:17mm;height:19mm;background:var(--document-blue);border-radius:3mm;color:#fff;font-size:42px;font-weight:700;line-height:1}
+#print-area .document-eyebrow{display:block;color:var(--document-blue);font-size:9px;font-weight:700;letter-spacing:1.6px;line-height:1.7}
+#print-area h1{margin:1mm 0;font-size:30px;font-weight:700;line-height:1.4;color:var(--document-deep)}
+#print-area .document-brand p{font-size:12px;color:#536b89}
+#print-area .document-heading{min-width:49mm;max-width:80mm;padding-top:4mm;text-align:end}
+#print-area h2{font-size:21px;line-height:1.5;color:var(--document-blue);margin-bottom:4mm}
+#print-area .document-heading dl{display:grid;gap:1.5mm}
+#print-area .document-detail{display:flex;justify-content:space-between;align-items:baseline;gap:4mm;min-width:0}
+#print-area dt{flex-shrink:0;color:#607795;font-size:11px}
+#print-area dd{min-width:0;font-weight:500;overflow-wrap:anywhere}
+#print-area .document-heading dd{font-weight:700;color:var(--document-deep)}
+#print-area .document-parties{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5mm;margin:6mm 0;break-inside:avoid}
+#print-area .document-party{min-width:0;padding:3mm 4mm;background:#f7faff;border:1px solid var(--document-line);border-radius:2mm;border-inline-start:1mm solid var(--document-blue)}
+#print-area .document-party h3{font-size:12px;font-weight:700;color:var(--document-blue);margin-bottom:3mm}
+#print-area .document-party dl{display:grid;gap:2mm}
+#print-area .document-party .document-detail{display:block}
+#print-area .document-party dt{font-size:10px;margin-bottom:.5mm}
+#print-area .document-party dd{font-size:14px}
+#print-area table{width:100%;table-layout:fixed;border-collapse:collapse;white-space:normal;font-size:13px}
+#print-area .document-description-column{width:62%}
+#print-area .document-quantity-column{width:12%}
+#print-area .document-amount-column{width:26%}
+#print-area thead{display:table-header-group}
+#print-area th{padding:3.5mm 4mm;background:var(--document-blue);color:#fff;border:0;font-size:12px;font-weight:500;text-align:start}
+#print-area td{padding:3.5mm 4mm;border-bottom:1px solid var(--document-line);vertical-align:top;overflow-wrap:anywhere}
+#print-area td:nth-child(2),#print-area th:nth-child(2){text-align:center}
+#print-area td:last-child,#print-area th:last-child{text-align:end}
+#print-area td:last-child{font-weight:500;font-variant-numeric:tabular-nums}
+#print-area tbody tr:nth-child(even){background:#f7faff}
+#print-area .document-description{white-space:pre-wrap;overflow-wrap:anywhere}
+#print-area .document-item-kind{display:block;margin-top:1.5mm;font-size:10px;color:#607795}
+#print-area .document-summary{display:flex;justify-content:flex-end;margin:4mm 0;break-inside:avoid}
+#print-area .totals{width:84mm;max-width:100%;padding:2mm 0;border:1px solid var(--document-line);border-radius:2mm;overflow:hidden}
+#print-area .document-total-row{display:flex;justify-content:space-between;align-items:baseline;gap:4mm;padding:1mm 4mm}
+#print-area .document-total-row>span{font-size:11px;color:#536b89;min-width:0}
+#print-area .document-total-row strong{flex-shrink:0;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums}
+#print-area .document-grand-total{margin:1.5mm 0;padding-block:2mm;background:var(--document-light);border-block:1px solid var(--document-line);color:var(--document-deep)}
+#print-area .document-grand-total>span,#print-area .document-grand-total strong{color:var(--document-deep);font-size:15px;font-weight:700}
+#print-area .document-balance strong{font-weight:700;color:var(--document-blue)}
+#print-area .document-footer{display:flex;align-items:center;justify-content:space-between;gap:8mm;margin-top:0;padding:4mm 1mm 1mm;border-top:.4mm solid var(--document-line);break-inside:avoid}
+#print-area .document-closing{min-width:0;max-width:112mm}
+#print-area .document-thanks{margin-top:2mm;font-size:20px;font-weight:700;color:var(--document-deep)}
+#print-area .document-disclaimer{margin-top:2mm;font-size:10px;color:#607795}
+#print-area .document-seal{flex-shrink:0;width:55mm;display:flex;align-items:center;flex-direction:column;text-align:center;gap:2mm}
+#print-area .garage-stamp{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;width:37mm;height:37mm;padding:5mm;border:1mm double var(--document-blue);border-radius:50%;color:var(--document-blue);transform:rotate(-8deg);line-height:1.5}
+#print-area .garage-stamp::before{content:"";position:absolute;inset:1.5mm;border:.25mm dashed var(--document-blue);border-radius:50%}
+#print-area .stamp-stars{font-size:10px;letter-spacing:1px;line-height:1}
+#print-area .stamp-garage{display:block;margin-top:1mm;font-size:14px;font-weight:700;white-space:nowrap}
+#print-area .stamp-name{display:block;margin:.5mm 0;font-size:20px;font-weight:700;letter-spacing:1px;line-height:1.5}
+#print-area .stamp-service{display:block;font-size:10px;font-weight:500;white-space:nowrap}
+#print-area .electronic-stamp{font-size:12px;font-weight:700;color:var(--document-blue);line-height:1.5}
+#print-area .electronic-stamp span{display:block}
 
 /* Vehicle illustrations and message preferences. */
 .vehicle-emblem{width:74px;height:74px;padding:3px;background:#faf9f5}
