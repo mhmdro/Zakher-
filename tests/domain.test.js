@@ -161,3 +161,70 @@ test('backup accepts legacy absent language and valid optional preferences but r
   assert.throws(()=>validateBackup(copy),/لغة رسالة المستند غير صالحة/);
  }
 });
+
+test('legacy backups keep absent suppliers, vehicle and document metadata unchanged',()=>{
+ const legacy=demo(),before=structuredClone(legacy);
+ assert.equal(validateBackup(legacy),legacy);assert.deepEqual(legacy,before);
+ assert(!Object.hasOwn(legacy,'suppliers'));
+ assert(!Object.hasOwn(legacy.vehicles[0],'vin'));assert(!Object.hasOwn(legacy.orders[0],'documentLanguage'));
+ assert(!Object.hasOwn(legacy.orders[0],'descriptionEn'));assert(!Object.hasOwn(legacy.orders[0],'partsRequest'));
+});
+
+test('backup accepts optional vehicle details, suppliers and bilingual document metadata',()=>{
+ const s=demo();s.vehicles[0].vin='1HGCM82633A004352';s.vehicles[0].year=2020;s.vehicles[0].engine='2.0L';s.vehicles[0].fuel='Petrol';
+ s.vehicles[1].vin='';s.vehicles[1].year='';s.vehicles[1].engine='';s.vehicles[1].fuel='';
+ s.suppliers=[{id:'supplier-1',name:'Nissan parts',phone:'+971501234567',brands:['nissan'],notes:'Saved contact',active:true},{id:'supplier-2',name:'General store',phone:'447700900123',brands:['*']}];
+ s.orders[0].documentLanguage='both';s.orders[0].descriptionEn='Oil service';
+ for(const translationSource of ['manual','ai','dictionary',''])for(const updatedAt of ['2026-11-04T08:30:00.000Z','2026-11-04T08:30:00Z','2026-11-04T12:30:00+04:00']){
+  s.orders[0].partsRequest={arText:'فلتر زيت',enText:'Oil filter',translationSource,updatedAt};
+  const before=structuredClone(s);assert.equal(validateBackup(s),s);assert.deepEqual(s,before);
+ }
+ delete s.orders[0].partsRequest.updatedAt;assert.equal(validateBackup(s),s);
+});
+
+test('backup rejects malformed optional vehicle metadata without normalizing it silently',()=>{
+ const cases=[['vin','1hgcm82633a004352'],['vin','1HGCM82633A00435I'],['vin','1HGCM82633A00435O'],['vin','1HGCM82633A00435Q'],['vin','1HGCM82633A00435'],['vin',undefined],['vin',null],['year','2020'],['year',1899],['year',new Date().getUTCFullYear()+2],['year',2020.5],['year',null],['engine',10],['fuel',false]];
+ for(const [key,value] of cases){const s=demo();s.vehicles[0][key]=value;const before=structuredClone(s);assert.throws(()=>validateBackup(s),/رقم الهيكل|سنة السيارة|المحرك/);assert.deepEqual(s,before)}
+});
+
+test('supplier backup validation requires unique contacts, normalized phones and allowlisted specialties',()=>{
+ const supplier={id:'supplier-1',name:'Parts supplier',phone:'+971501234567',brands:['nissan'],notes:'',active:true};
+ const invalid=[null,{},[{...supplier,id:''}],[supplier,{...supplier}],[{...supplier,name:' '}],[{...supplier,phone:'0501234567'}],[{...supplier,phone:'+971 50 123 4567'}],[{...supplier,phone:'+97150123456'}],[{...supplier,phone:null}],[{...supplier,brands:['not-a-brand']}],[{...supplier,brands:'nissan'}],[{...supplier,brands:['nissan','nissan']}],[{...supplier,notes:3}],[{...supplier,active:'true'}]];
+ for(const suppliers of invalid){const s=demo();s.suppliers=suppliers;assert.throws(()=>validateBackup(s),/المورد/)}
+ const s=demo();s.suppliers=[];assert.equal(validateBackup(s),s);
+});
+
+test('document language creation validates before stock changes and survives pricing edits',()=>{
+ const s=demo();
+ for(const documentLanguage of ['ar','en','both']){
+  const order=createOrder(s,{vehicleId:'v1',description:'Oil service',descriptionEn:'Oil service',kind:'invoice',labor:10,documentLanguage});
+  assert.equal(order.documentLanguage,documentLanguage);
+  updateOrder(s,order.id,{labor:20,documentLanguage:'invalid'});assert.equal(order.documentLanguage,documentLanguage);
+  order.paid=true;const before=structuredClone(s);assert.throws(()=>updateOrder(s,order.id,{labor:30}),/ألغِ تسجيل الدفع/);assert.deepEqual(s,before);
+ }
+ for(const documentLanguage of ['fr','',null,1]){
+  const before=structuredClone(s);assert.throws(()=>createOrder(s,{vehicleId:'v1',description:'Repair',kind:'invoice',labor:10,partId:'p1',qty:1,documentLanguage}),/لغة المستند/);assert.deepEqual(s,before);
+ }
+ for(const documentLanguage of ['fr','',null,undefined]){const copy=demo();copy.orders[0].documentLanguage=documentLanguage;assert.throws(()=>validateBackup(copy),/لغة المستند/)}
+});
+
+test('optional English service descriptions can be edited without changing paid or legacy invoices',()=>{
+ const s=demo(),legacy=s.orders[0];updateOrder(s,legacy.id,{labor:100});assert(!Object.hasOwn(legacy,'descriptionEn'));
+ const order=createOrder(s,{vehicleId:'v1',description:'خدمة',descriptionEn:'English service',kind:'invoice',labor:10});
+ updateOrder(s,order.id,{labor:20});assert.equal(order.descriptionEn,'English service');
+ updateOrder(s,order.id,{descriptionEn:'Updated English service'});assert.equal(order.descriptionEn,'Updated English service');
+ updateOrder(s,order.id,{descriptionEn:''});assert.equal(order.descriptionEn,'');
+ for(const descriptionEn of [null,42,'x'.repeat(10001)]){
+  const before=structuredClone(s);assert.throws(()=>updateOrder(s,order.id,{descriptionEn}),/بالإنجليزية/);assert.deepEqual(s,before);
+  assert.throws(()=>createOrder(s,{vehicleId:'v1',description:'خدمة',kind:'invoice',labor:10,descriptionEn}),/بالإنجليزية/);assert.deepEqual(s,before);
+  const copy=demo();copy.orders[0].descriptionEn=descriptionEn;assert.throws(()=>validateBackup(copy),/بالإنجليزية/);
+ }
+ order.paid=true;const before=structuredClone(s);assert.throws(()=>updateOrder(s,order.id,{descriptionEn:'Changed'}),/ألغِ تسجيل الدفع/);assert.deepEqual(s,before);
+});
+
+test('parts request backups reject malformed drafts, source labels and timestamps',()=>{
+ const good={arText:'فلتر زيت',enText:'Oil filter',translationSource:'manual',updatedAt:'2026-11-04T08:30:00Z'};
+ for(const partsRequest of [null,[],{}, {...good,arText:null},{...good,enText:1},{...good,translationSource:'automatic'},{...good,translationSource:undefined},{...good,updatedAt:'tomorrow'},{...good,updatedAt:'2026-02-30T08:30:00Z'},{...good,updatedAt:'2026-11-04T25:30:00Z'},{...good,updatedAt:null}]){
+  const s=demo();s.orders[0].partsRequest=partsRequest;const before=structuredClone(s);assert.throws(()=>validateBackup(s),/طلب قطع الغيار/);assert.deepEqual(s,before);
+ }
+});

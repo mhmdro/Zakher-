@@ -2,11 +2,37 @@ export const empty=()=>({customers:[],vehicles:[],parts:[],orders:[],expenses:[]
 export const id=()=>crypto.randomUUID();
 export function money(n){return Math.round((Number(n)+Number.EPSILON)*100)/100}
 export function amount(value){const n=Number(value);if(!Number.isFinite(n)||n<0||value==='')throw Error('أدخل مبلغًا صحيحًا غير سالب');return money(n)}
+// Optional supplier/vehicle metadata is validated without changing legacy records.
+export const SUPPORTED_SUPPLIER_BRANDS=Object.freeze([
+ 'nissan','toyota','bmw','honda','hyundai','kia','audi','volkswagen','ford','chevrolet',
+ 'mitsubishi','mazda','suzuki','subaru','renault','peugeot','porsche','tesla','volvo',
+ 'jeep','infiniti','cadillac','bentley','mini','skoda','rollsroyce','mercedes','landrover'
+]);
+export function validateVehicleVin(value='',{allowEmpty=true}={}) {
+ if(typeof value!=='string'||(value===''&&!allowEmpty)||(value!==''&&!/^[A-HJ-NPR-Z0-9]{17}$/.test(value))) {
+  throw Error('رقم الهيكل VIN يجب أن يكون 17 حرفًا إنجليزيًا كبيرًا أو رقمًا، دون I أو O أو Q.');
+ }
+ return value;
+}
+function validISOTime(value) {
+ if(typeof value!=='string')return false;
+ const match=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(value);
+ if(!match||!Number.isFinite(Date.parse(value)))return false;
+ const [,year,month,day,hour,minute,second,zoneHour=0,zoneMinute=0]=match.map((part,index)=>index===0?part:part===undefined?undefined:Number(part));
+ return month>=1&&month<=12&&day>=1&&day<=new Date(Date.UTC(year,month,0)).getUTCDate()&&hour<24&&minute<60&&second<60&&zoneHour<24&&zoneMinute<60;
+}
+function validNormalizedSupplierPhone(value) {
+ if(typeof value!=='string'||!/^\+?[1-9]\d{7,14}$/.test(value))return false;
+ const digits=value.replace(/^\+/,'');
+ try{return normalizeWhatsAppPhone('+'+digits)===digits}catch{return false}
+}
 export function createOrder(s,o){
  if(!s.vehicles.some(v=>v.id===o.vehicleId))throw Error('اختر سيارة مسجلة');
  if(!o.description?.trim())throw Error('أدخل وصف الخدمة');
  if(!['quote','invoice'].includes(o.kind))throw Error('نوع المستند غير صالح');
  if(o.messageLanguage!==undefined&&!['ar','en'].includes(o.messageLanguage))throw Error('اختر العربية أو الإنجليزية لرسالة واتساب.');
+ if(o.documentLanguage!==undefined&&!['ar','en','both'].includes(o.documentLanguage))throw Error('اختر لغة المستند: العربية أو الإنجليزية أو اللغتين.');
+ if(o.descriptionEn!==undefined&&(typeof o.descriptionEn!=='string'||o.descriptionEn.length>10000))throw Error('وصف الخدمة بالإنجليزية غير صالح أو طويل جدًا.');
  const labor=amount(o.labor),qty=Number(o.qty||0),part=o.partId?s.parts.find(p=>p.id===o.partId):null;
  if(!Number.isInteger(qty)||qty<0||(!part&&qty))throw Error('كمية القطعة غير صحيحة');
  if(part&&qty<1)throw Error('حدد كمية القطع');
@@ -14,6 +40,8 @@ export function createOrder(s,o){
  const subtotal=money(labor+(part?part.price*qty:0));
  const order={id:id(),number:`${o.kind==='quote'?'Q':'INV'}-${s.orders.length+1001}`,date:new Date().toISOString(),vehicleId:o.vehicleId,description:o.description.trim(),kind:o.kind,status:o.kind==='quote'?'عرض سعر':'قيد العمل',paid:false,labor,qty,partId:part?.id||'',partName:part?.name||'',partPrice:part?.price||0,cost:money((part?.cost||0)*qty),subtotal,tax:money(subtotal*0.05),total:money(subtotal*1.05)};
  if(o.messageLanguage!==undefined)order.messageLanguage=o.messageLanguage;
+ if(o.documentLanguage!==undefined)order.documentLanguage=o.documentLanguage;
+ if(o.descriptionEn!==undefined)order.descriptionEn=o.descriptionEn;
  if(o.kind==='invoice'&&part)part.stock-=qty;
  s.orders.push(order);return order;
 }
@@ -23,6 +51,7 @@ export function updateOrder(s,orderId,changes={}) {
  if(!order)throw Error('أمر الصيانة غير موجود.');
  if(order.kind==='invoice'&&order.paid)throw Error('ألغِ تسجيل الدفع أولًا لتعديل الفاتورة.');
  if(!changes||typeof changes!=='object')throw Error('بيانات التعديل غير صحيحة.');
+ if(changes.descriptionEn!==undefined&&(typeof changes.descriptionEn!=='string'||changes.descriptionEn.length>10000))throw Error('وصف الخدمة بالإنجليزية غير صالح أو طويل جدًا.');
  const description=changes.description===undefined?order.description:changes.description;
  if(typeof description!=='string'||!description.trim())throw Error('أدخل وصف الخدمة');
  const labor=amount(changes.labor===undefined?order.labor:changes.labor);
@@ -44,6 +73,7 @@ export function updateOrder(s,orderId,changes={}) {
  const subtotal=money(labor+partPrice*qty),tax=money(subtotal*0.05),total=money(subtotal*1.05),cost=money(unitCost*qty);
  if(![subtotal,tax,total,cost].every(Number.isFinite))throw Error('المبلغ أو الكمية أكبر من المسموح.');
  const updated={description:description.trim(),labor,qty,partId:part?.id||'',partName:part?(samePart?order.partName:part.name):'',partPrice,cost,subtotal,tax,total};
+ if(changes.descriptionEn!==undefined)updated.descriptionEn=changes.descriptionEn;
  // All validation is complete before either stock or the order changes.
  if(order.kind==='invoice') {
   if(oldPart)oldPart.stock+=order.qty;
@@ -58,7 +88,28 @@ export function validateBackup(s){
  const str=x=>typeof x==='string',num=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
  for(const k of ['customers','vehicles','parts','orders','expenses']){if(s[k].some(x=>!x||!str(x.id))||new Set(s[k].map(x=>x.id)).size!==s[k].length)throw Error('معرّفات غير صالحة')}
  if(s.customers.some(x=>!str(x.name)||!str(x.phone))||s.vehicles.some(x=>!str(x.model)||!str(x.plate)||!s.customers.some(c=>c.id===x.customerId))||s.parts.some(x=>!str(x.name)||!num(x.price)||!num(x.cost)||!Number.isInteger(x.stock)||x.stock<0)||s.expenses.some(x=>!str(x.name)||!num(x.amount)))throw Error('بيانات غير صالحة');
+ if(s.vehicles.some(vehicle=>
+  (Object.hasOwn(vehicle,'vin')&&(typeof vehicle.vin!=='string'||(vehicle.vin!==''&&!/^[A-HJ-NPR-Z0-9]{17}$/.test(vehicle.vin))))||
+  (Object.hasOwn(vehicle,'year')&&vehicle.year!==''&&(!Number.isInteger(vehicle.year)||vehicle.year<1900||vehicle.year>new Date().getUTCFullYear()+1))||
+  ['engine','fuel'].some(key=>Object.hasOwn(vehicle,key)&&typeof vehicle[key]!=='string')
+ ))throw Error('بيانات رقم الهيكل أو سنة السيارة أو المحرك غير صالحة');
+ if(Object.hasOwn(s,'suppliers')) {
+  if(!Array.isArray(s.suppliers))throw Error('قائمة الموردين غير صالحة');
+  if(s.suppliers.some(supplier=>!supplier||typeof supplier.id!=='string'||!supplier.id.trim())||new Set(s.suppliers.map(supplier=>supplier.id)).size!==s.suppliers.length)throw Error('معرّفات الموردين غير صالحة');
+  const supported=new Set([...SUPPORTED_SUPPLIER_BRANDS,'*']);
+  if(s.suppliers.some(supplier=>typeof supplier.name!=='string'||!supplier.name.trim()||!validNormalizedSupplierPhone(supplier.phone)||!Array.isArray(supplier.brands)||supplier.brands.some(brand=>!supported.has(brand))||new Set(supplier.brands).size!==supplier.brands.length||
+   (Object.hasOwn(supplier,'notes')&&typeof supplier.notes!=='string')||(Object.hasOwn(supplier,'active')&&typeof supplier.active!=='boolean')
+  ))throw Error('بيانات المورد أو رقم واتساب أو تخصصه غير صالحة');
+ }
  if(s.orders.some(x=>Object.hasOwn(x,'messageLanguage')&&!['ar','en'].includes(x.messageLanguage)))throw Error('لغة رسالة المستند غير صالحة');
+ if(s.orders.some(x=>Object.hasOwn(x,'documentLanguage')&&!['ar','en','both'].includes(x.documentLanguage)))throw Error('لغة المستند غير صالحة');
+ if(s.orders.some(x=>Object.hasOwn(x,'descriptionEn')&&(typeof x.descriptionEn!=='string'||x.descriptionEn.length>10000)))throw Error('وصف الخدمة بالإنجليزية غير صالح أو طويل جدًا.');
+ if(s.orders.some(x=>Object.hasOwn(x,'partsRequest')&&(
+  !x.partsRequest||typeof x.partsRequest!=='object'||Array.isArray(x.partsRequest)||
+  typeof x.partsRequest.arText!=='string'||typeof x.partsRequest.enText!=='string'||
+  !['manual','ai','dictionary',''].includes(x.partsRequest.translationSource)||
+  (Object.hasOwn(x.partsRequest,'updatedAt')&&!validISOTime(x.partsRequest.updatedAt))
+ )))throw Error('بيانات طلب قطع الغيار غير صالحة');
  if(s.orders.some(x=>!['quote','invoice'].includes(x.kind)||!str(x.number)||!str(x.description)||!str(x.status)||!str(x.date)||!str(x.partName)||typeof x.paid!=='boolean'||!s.vehicles.some(v=>v.id===x.vehicleId)||!['labor','qty','partPrice','cost','subtotal','tax','total'].every(k=>num(x[k]))))throw Error('مستند غير صالح');
  return s;
 }

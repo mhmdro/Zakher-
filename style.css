@@ -399,3 +399,36 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;paddin
 .vehicle-mark-empty{display:grid;place-items:center;flex:0 0 52px;width:52px;height:52px;border-radius:8px;background:#f3f1ec;color:#8b8273;font-size:27px;font-weight:500}
 .vehicle-emblem .vehicle-mark-empty{width:100%;height:100%;background:transparent}
 @media(max-width:760px){.vehicle-emblem{padding:12px}.vehicle-preview img{width:68px;height:62px;padding:8px}.vehicle-preview .vehicle-mark-empty{flex-basis:60px}}
+/* Bilingual documents, VIN review and supplier enquiries. */
+.header-meta{flex-wrap:wrap}
+.ui-language-control{display:flex;align-items:center;gap:7px;font-size:12px}
+#ui-language{width:auto;min-height:40px;padding:7px 25px 7px 10px;font-size:16px;background:transparent}
+.document-language{min-height:44px;font-size:16px;max-width:100%;margin:8px 0 12px}
+#workshop-dialog{width:min(760px,calc(100% - 28px))}
+#workshop-dialog .dialog-head>div{min-width:0}
+#workshop-dialog .dialog-head .hint{margin-bottom:0;overflow-wrap:anywhere}
+#workshop-dialog form>button.primary{width:100%;margin-top:14px}
+#workshop-dialog .form-advanced p{overflow-wrap:anywhere}
+.supplier-list{display:grid;gap:13px;margin-top:20px}
+.supplier-card{padding:18px;border:1px solid var(--line);border-radius:10px}
+.supplier-card p{margin:7px 0;font-size:14px;overflow-wrap:anywhere}
+.supplier-brands{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 15px;max-height:290px;overflow:auto;margin:20px 0;padding:15px;border:1px solid var(--line);border-radius:9px}
+.supplier-brands legend{padding:0 6px;font-weight:500}
+.supplier-brands .check-option{font-size:14px;margin:0;padding:7px 0}
+.supplier-brands .check-option span{min-width:0;overflow-wrap:anywhere}
+.supplier-match{padding:18px;margin-top:18px;background:#faf9f5}
+.supplier-match h3{font-size:18px}
+#supplier-message-container{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+#supplier-whatsapp{color:#fff}
+.vin-section{margin-block:15px 20px}
+.vin-section input[type=file]{padding:9px;font-size:14px;background:white}
+.vin-section [name=vin]{font-family:Tajawal,monospace;letter-spacing:1px;font-weight:500}
+.vin-candidates{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+.vin-candidates button{max-width:100%;overflow-wrap:anywhere;font-family:monospace;font-size:13px;direction:ltr}
+.vin-review{margin:15px 0;padding:15px;border:1px solid #d8dfd7;border-radius:9px;background:#f7faf5}
+.vin-review h3{font-size:17px}
+.vin-review p{margin:9px 0;font-size:14px;overflow-wrap:anywhere}
+.vin-status{min-height:1em}
+html[dir=ltr] .section-kicker{text-align:left}
+@media(max-width:760px){.header-meta{gap:6px}#ui-language{min-height:42px;max-width:112px;background:#fff;color:var(--navy)}.header-meta .current-date{display:none}.header-meta .badge{display:none}#workshop-dialog{width:calc(100% - 20px);padding:18px}.supplier-brands{gap:0 10px;padding:10px}.supplier-brands .check-option{font-size:13px}#workshop-dialog .details-actions button{font-size:13px;min-height:46px;flex-basis:100%}.vin-section input[type=file]{font-size:16px}.supplier-match{padding:14px}.card-info .info-value[dir=ltr]{font-size:12px;overflow-wrap:anywhere}}
+@media(max-width:760px){.topbar{gap:10px}.header-brand{min-width:0;flex:1}.header-brand .brand-copy{min-width:0;white-space:normal}.header-brand .brand-copy p{font-size:18px}.header-meta{flex-shrink:0}.ui-language-control>span{display:none}#ui-language{width:95px;max-width:95px;padding-inline:8px;font-size:16px}}

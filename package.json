@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "build": "node scripts/build-static.js",
-    "test": "node --test --test-isolation=none tests/domain.test.js tests/vehicle-art.test.js"
+    "test": "node --test --test-isolation=none tests/domain.test.js tests/vehicle-art.test.js tests/procurement.test.js tests/vin.test.js tests/i18n.test.js"
   },
   "engines": {
     "node": ">=22"

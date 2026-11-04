@@ -1,51 +1,8 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import {publicFiles} from './static-files.js';
 
-const allowedFiles = [
-  'app.js', 'style.css', 'domain.js', 'vehicle-art.js',
-  'assets/fonts/tajawal-arabic-400-normal.woff2',
-  'assets/fonts/tajawal-arabic-500-normal.woff2',
-  'assets/fonts/tajawal-arabic-700-normal.woff2',
-  'assets/fonts/tajawal-latin-400-normal.woff2',
-  'assets/fonts/tajawal-latin-500-normal.woff2',
-  'assets/fonts/tajawal-latin-700-normal.woff2',
-  'assets/brands/nissan.svg',
-  'assets/brands/toyota.svg',
-  'assets/brands/bmw.svg',
-  'assets/brands/honda.svg',
-  'assets/brands/hyundai.svg',
-  'assets/brands/kia.svg',
-  'assets/brands/audi.svg',
-  'assets/brands/volkswagen.svg',
-  'assets/brands/ford.svg',
-  'assets/brands/chevrolet.svg',
-  'assets/brands/mitsubishi.svg',
-  'assets/brands/mazda.svg',
-  'assets/brands/suzuki.svg',
-  'assets/brands/subaru.svg',
-  'assets/brands/renault.svg',
-  'assets/brands/peugeot.svg',
-  'assets/brands/porsche.svg',
-  'assets/brands/tesla.svg',
-  'assets/brands/volvo.svg',
-  'assets/brands/jeep.svg',
-  'assets/brands/infiniti.svg',
-  'assets/brands/cadillac.svg',
-  'assets/brands/bentley.svg',
-  'assets/brands/mini.svg',
-  'assets/brands/skoda.svg',
-  'assets/brands/rollsroyce.svg',
-  'assets/brands/mercedes.svg',
-  'assets/brands/landrover.svg',
-  'assets/brands/LICENSE.md',
-  'assets/brands/README.md',
-  'assets/fonts/OFL.txt',
-  'assets/fonts/README.md',
-];
-const files = Object.fromEntries([
-  ['/', 'index.html'],
-  ...allowedFiles.map(file => [`/${file}`, file]),
-]);
+const files=Object.fromEntries([['/','index.html'],...publicFiles.map(file=>['/'+file,file])]);
 const types = {
   html: 'text/html; charset=utf-8',
   js: 'text/javascript; charset=utf-8',
@@ -54,6 +11,9 @@ const types = {
   svg: 'image/svg+xml',
   txt: 'text/plain; charset=utf-8',
   md: 'text/plain; charset=utf-8',
+  wasm: 'application/wasm',
+  gz: 'application/gzip',
+  json: 'application/json',
 };
 
 http.createServer(async (req, res) => {

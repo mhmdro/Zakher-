@@ -240,10 +240,11 @@ const legacy={
     assert((await p.locator('.stat').nth(3).textContent()).includes('195.00'),'Profit excludes quote and VAT, includes costs and expenses');
     await nav('orders');await expand(oid);
     await p.evaluate(()=>window.print=()=>{window.__zakherPrintCalls=(window.__zakherPrintCalls||0)+1});
+    await card(oid).locator('.document-language').selectOption('both');
     await card(oid).locator(`[data-print="${oid}"]`).click();
     assert.equal(await p.evaluate(()=>window.__zakherPrintCalls),1);
     assert((await p.locator('#print-area').textContent()).includes('157.50'));
-    assert((await p.locator('#print-area').textContent()).includes('Demo Invoice'));
+    assert(/Demo invoice/i.test(await p.locator('#print-area').textContent()));
 
     // Export, change data, then import: verify restoration rather than a toast only.
     await nav('backup');const beforeBackup=await data();
