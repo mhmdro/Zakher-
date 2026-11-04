@@ -1,7 +1,7 @@
-import {id,normalizeWhatsAppPhone,buildWhatsAppUrl} from './domain.js?v=6';
-import {vehicleArtwork} from './vehicle-art.js?v=6';
-import {SUPPORTED_SUPPLIER_BRANDS,validateVehicleVin,supplierRecommendations,buildPartsRequestMessage,translateCommonParts} from './procurement.js?v=6';
-import {normalizeVin,recognizeVinImage,lookupVin} from './vin.js?v=6';
+import {id,normalizeWhatsAppPhone,buildWhatsAppUrl} from './domain.js?v=7';
+import {vehicleArtwork} from './vehicle-art.js?v=7';
+import {SUPPORTED_SUPPLIER_BRANDS,validateVehicleVin,supplierRecommendations,buildPartsRequestMessage,translateCommonParts} from './procurement.js?v=7';
+import {normalizeVin,recognizeVinImage,lookupVin} from './vin.js?v=7';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function initializeWorkshop({getState,saveState,toast,getLanguage}){
@@ -58,7 +58,7 @@ export function initializeWorkshop({getState,saveState,toast,getLanguage}){
     if(menu&&!menu.querySelector('[data-workshop-suppliers]'))menu.insertAdjacentHTML('beforeend',`<button class="menu-card" data-workshop-suppliers><b>${w('محلات قطع الغيار','Parts suppliers')}</b><span>${w('الأرقام والتخصصات والترشيح حسب الماركة','Contacts, specialties and make matching')}</span></button>`);
     for(const card of document.querySelectorAll('article.work-card')){
       const orderId=card.querySelector('[data-print]')?.dataset.print;
-      const actions=card.querySelector('.details-actions');if(!orderId||!actions||actions.querySelector('[data-procurement]'))continue;
+      const actions=card.querySelector('.details-actions');if(!orderId||!actions||orderById(orderId)?.guest||actions.querySelector('[data-procurement]'))continue;
       actions.insertAdjacentHTML('beforeend',`<button class="secondary" data-procurement="${esc(orderId)}">${w('الشاصي وطلب قطع الغيار','VIN and parts enquiry')}</button>`);
       const car=carFor(orderById(orderId));if(car?.vin){const target=card.querySelector('.card-info');target?.insertAdjacentHTML('beforeend',`<div class="info-item"><span class="info-label">VIN</span><p class="info-value" dir="ltr">${esc(car.vin)}</p></div>`)}
     }

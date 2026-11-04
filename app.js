@@ -1,7 +1,9 @@
-import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=6';
-import {vehicleArtwork} from './vehicle-art.js?v=6';
-import {createTranslator} from './i18n.js?v=6';
-import {initializeWorkshop} from './workshop.js?v=6';
+import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=7';
+import {vehicleArtwork} from './vehicle-art.js?v=7';
+import {createTranslator} from './i18n.js?v=7';
+import {initializeWorkshop} from './workshop.js?v=7';
+import {orderVehicle,paymentSummary,recordPayment,voidAllPayments,isDelivered,salaryExpenseRows} from './ledger.js?v=7';
+import {initializeOperations} from './operations-ui.js?v=7';
 
 const $=selector=>document.querySelector(selector);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -18,14 +20,14 @@ const ht=(text,vars={},language)=>esc(t(text,vars,language));
 let state,storageWarning=false;
 try {state=localStorage.getItem(key)?validateBackup(JSON.parse(localStorage.getItem(key))):demo()}
 catch {state=empty();storageWarning=true}
-let page='dashboard',query='',workFilter='active',submit,toastTimer,messageContext,messageDrafts={},messageLanguage='ar',workshop;
+let page='dashboard',query='',workFilter='active',submit,toastTimer,messageContext,messageDrafts={},messageLanguage='ar',workshop,operations;
 const documentChoices=new Map();
 const tabs=[['dashboard','car','الورشة'],['orders','file','الفواتير'],['customers','users','العملاء'],['more','menu','المزيد']];
 const paths={car:'M5 17H3v-6l2-6h14l2 6v6h-2M5 17h14M5 17v3m14-3v3M3 11h18M7 14h.01M17 14h.01',file:'M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8M8 16h6',users:'M16 21v-3a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v3M16 4a4 4 0 0 1 0 8M22 21v-3a4 4 0 0 0-3-3.87M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',menu:'M4 6h16M4 12h16M4 18h16',plus:'M12 5v14M5 12h14',check:'m5 12 4 4L19 6',chat:'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z',box:'m12 3 9 5-9 5-9-5 9-5Zm-9 5v9l9 5 9-5V8M12 13v9',money:'M3 5h18v14H3V5Zm12 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',backup:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5'};
 const icon=name=>`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.file}"/></svg>`;
 const cash=(value,language=preferences.uiLanguage)=>Number(value).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2})+' '+t('د.إ',{},language);
-const vehicle=order=>state.vehicles.find(car=>car.id===order.vehicleId);
-const customer=car=>state.customers.find(owner=>owner.id===car?.customerId);
+const vehicle=order=>orderVehicle(state,order);
+const customer=car=>state.vehicles.includes(car)?state.customers.find(owner=>owner.id===car?.customerId):car?.guestCustomer;
 const isReady=order=>order.status==='مكتمل';
 function savePreferences(patch){try{const next={...preferences,...patch};localStorage.setItem(preferenceKey,JSON.stringify(next));preferences=next;return true}catch{toast('تعذّر حفظ التفضيل على هذا الجهاز.');return false}}
 function toast(message){clearTimeout(toastTimer);$('#toast').textContent=t(message);$('#toast').style.display='block';toastTimer=setTimeout(()=>$('#toast').style.display='none',4000)}
@@ -49,16 +51,17 @@ function matches(order){const car=vehicle(order);return [order.number,order.desc
 function documentLanguage(order){return documentChoices.get(order.id)||order.documentLanguage||preferences.uiLanguage}
 function languageOptions(selected,includeBoth=false){return [['ar','العربية'],['en','English'],...(includeBoth?[['both','العربية والإنجليزية']]:[])].map(([value,label])=>`<option value="${value}" ${value===selected?'selected':''}>${ht(label)}</option>`).join('')}
 function orderCard(order){
-  const car=vehicle(order),owner=customer(car),quote=order.kind==='quote',ready=isReady(order),art=vehicleArtwork(car?.model);
+  const car=vehicle(order),owner=customer(car),quote=order.kind==='quote',ready=isReady(order),delivered=isDelivered(order),balance=paymentSummary(order),art=vehicleArtwork(car?.model);
   return `<article class="work-card ${ready?'ready':''}" data-order-id="${esc(order.id)}">
-    <div class="card-top"><span class="pill ${quote?'blue':ready?'done':''}">${ht(quote?'عرض سعر':ready?'جاهزة للتسليم':'داخل الورشة')}</span><span class="order-number" dir="ltr">${esc(order.number)}</span></div>
+    <div class="card-top"><span class="pill ${quote?'blue':ready?'done':''}">${ht(quote?'عرض سعر':delivered?'سُلّمت للعميل':ready?'جاهزة للتسليم':'داخل الورشة')}</span><span class="order-number" dir="ltr">${esc(order.number)}</span></div>
     <div class="vehicle-heading"><div class="vehicle-emblem" title="${esc(art.label)}" aria-hidden="true">${art.src?`<img src="${esc(art.src)}" alt="" loading="lazy" decoding="async">`:'<span class="vehicle-mark-empty">?</span>'}</div><div><h2 class="car-name" dir="auto">${esc(car?.model)}</h2><span class="vehicle-subtitle">${ht('بطاقة صيانة')}</span></div></div>
     <div class="plate"><span class="plate-label">${ht('لوحة المركبة')}</span><bdi class="plate-number" dir="auto">${esc(car?.plate)}</bdi></div>
     <div class="card-info"><div class="info-item"><span class="info-label">${ht('العميل')}</span><p class="info-value customer-line" dir="auto">${esc(owner?.name)}</p></div><div class="info-item"><span class="info-label">${ht('الخدمة')}</span><p class="info-value service-description" dir="auto">${esc(order.description)}</p></div></div>
-    ${quote?'':`<div class="card-actions">${!ready?`<button class="primary" data-status="${esc(order.id)}">${icon('check')}${ht('السيارة جاهزة')}</button>`:''}<button class="whatsapp" data-message="${ready?'ready':'received'}" data-order="${esc(order.id)}">${icon('chat')}${ht(ready?'واتساب: السيارة جاهزة':'واتساب: تم الاستلام')}</button></div>`}
-    <details class="order-details"><summary>${ht(quote?'تفاصيل عرض السعر':'الفاتورة والمزيد')}</summary><p>${ht('الإجمالي')}: <b>${cash(order.total)}</b> <small>${ht('شامل الضريبة التجريبية ٥٪')}</small></p>${quote?'':`<p>${ht('الدفع')}: <b>${ht(order.paid?'مدفوعة':'غير مدفوعة')}</b></p>`}
+    ${quote||delivered?'':`<div class="card-actions">${!ready?`<button class="primary" data-status="${esc(order.id)}">${icon('check')}${ht('السيارة جاهزة')}</button>`:''}<button class="whatsapp" data-message="${ready?'ready':'received'}" data-order="${esc(order.id)}">${icon('chat')}${ht(ready?'واتساب: السيارة جاهزة':'واتساب: تم الاستلام')}</button></div>`}
+    ${quote?'':`<div class="card-balance"><span>${ht('المدفوع')}: ${cash(balance.received)}</span><strong>${ht('المتبقي')}: ${cash(balance.remaining)}</strong></div>`}
+    <details class="order-details"><summary>${ht(quote?'تفاصيل عرض السعر':'الفاتورة والمزيد')}</summary><p>${ht('الإجمالي')}: <b>${cash(order.total)}</b> <small>${ht('شامل الضريبة التجريبية ٥٪')}</small></p>${quote?'':`<p>${ht('الدفع')}: <b>${ht(order.total===0?'لا يوجد مبلغ مستحق':balance.isPaid?'مدفوعة':balance.received>0?'مدفوع جزئيًا':'غير مدفوعة')}</b></p>`}
       <label class="field">${ht('لغة الطباعة')}<select class="document-language" data-order="${esc(order.id)}">${languageOptions(documentLanguage(order),true)}</select></label>
-      <div class="details-actions">${!order.paid?`<button class="secondary" data-edit="${esc(order.id)}">${ht('تعديل الصيانة والتكلفة')}</button>`:''}<button class="secondary" data-print="${esc(order.id)}">${ht(quote?'طباعة العرض':'طباعة الفاتورة')}</button>${quote?'':`<button class="secondary" data-paid="${esc(order.id)}">${ht(order.paid?'إلغاء تسجيل الدفع':'تسجيل الدفع')}</button>${ready?`<button class="secondary" data-status="${esc(order.id)}">${ht('إعادة فتح الصيانة')}</button><button class="secondary" data-message="received" data-order="${esc(order.id)}">${ht('رسالة الاستلام')}</button>`:''}`}</div>
+      <div class="details-actions">${!order.paid?`<button class="secondary" data-edit="${esc(order.id)}">${ht('تعديل الصيانة والتكلفة')}</button>`:''}<button class="secondary" data-print="${esc(order.id)}">${ht(quote?'طباعة العرض':'طباعة الفاتورة')}</button>${quote?'':`${order.total>0?`<button class="secondary" data-paid="${esc(order.id)}">${ht(order.paid?'إلغاء جميع الدفعات':balance.received>0?'تسجيل كامل المتبقي':'تسجيل كامل المبلغ')}</button>`:''}${ready&&!delivered?`<button class="secondary" data-status="${esc(order.id)}">${ht('إعادة فتح الصيانة')}</button><button class="secondary" data-message="received" data-order="${esc(order.id)}">${ht('رسالة الاستلام')}</button>`:''}`}</div>
     </details>
   </article>`;
 }
@@ -69,8 +72,8 @@ function render(){
   const content=$('#content'),s=summary(state);
   if(page==='dashboard'){
     const invoices=[...state.orders].reverse().filter(order=>order.kind==='invoice');
-    const active=invoices.filter(order=>!isReady(order)),ready=invoices.filter(isReady);
-    const visible=invoices.filter(order=>(workFilter==='all'||(workFilter==='ready'?isReady(order):!isReady(order)))&&matches(order));
+    const active=invoices.filter(order=>!isReady(order)&&!isDelivered(order)),ready=invoices.filter(order=>isReady(order)&&!isDelivered(order));
+    const visible=invoices.filter(order=>(workFilter==='all'||(workFilter==='ready'?isReady(order)&&!isDelivered(order):!isReady(order)&&!isDelivered(order)))&&matches(order));
     content.innerHTML=`<section class="hero"><div class="hero-copy"><span class="section-kicker" dir="ltr">WORKSHOP / 01</span><h1>${ht('سيارات الورشة')}</h1><p>${ht('إدارة الصيانة، من الاستلام إلى التسليم.')}</p></div><button class="primary intake-cta" data-add="intake">${icon('plus')}${ht('استلام سيارة')}</button></section>
       <div class="workshop-counts" aria-label="${ht('حالة السيارات')}"><button class="count-card ${workFilter==='active'?'active':''}" data-filter="active" aria-pressed="${workFilter==='active'}"><strong>${active.length}</strong><span>${ht('داخل الورشة')}</span></button><button class="count-card ${workFilter==='ready'?'active':''}" data-filter="ready" aria-pressed="${workFilter==='ready'}"><strong>${ready.length}</strong><span>${ht('جاهزة للتسليم')}</span></button><button class="count-card ${workFilter==='all'?'active':''}" data-filter="all" aria-pressed="${workFilter==='all'}"><strong>${invoices.length}</strong><span>${ht('كل السيارات')}</span></button></div>
       <div class="list-heading"><div><h2>${ht(workFilter==='ready'?'جاهزة للتسليم':workFilter==='all'?'جميع السيارات':'الصيانة الجارية')}</h2><p class="list-caption">${ht('عرض {count} من {total} سيارة',{count:visible.length,total:invoices.length})}</p></div><div class="toolbar">${searchField('الاسم أو اللوحة')}</div></div>
@@ -84,9 +87,9 @@ function render(){
   if(page==='more')content.innerHTML=heading('أدوات الكراج','افتح ما تحتاجه عندما تحتاجه.')+`<div class="more-grid"><button class="menu-card" data-page="notifications">${icon('chat')}<b>${ht('رسائل واتساب')}</b><span>${ht('اللغة وخيارات إشعار العميل')}</span></button><button class="menu-card" data-page="parts">${icon('box')}<b>${ht('قطع الغيار والمخزون')}</b><span>${ht('الكميات وأسعار الشراء والبيع')}</span></button><button class="menu-card" data-page="finance">${icon('money')}<b>${ht('الحسابات والمصاريف')}</b><span>${ht('الربح، التحصيل والمصاريف')}</span></button><button class="menu-card" data-page="backup">${icon('backup')}<b>${ht('النسخ الاحتياطي')}</b><span>${ht('احفظ بياناتك أو انقلها لجهاز آخر')}</span></button></div><div class="panel help-panel"><h2>${ht('كيف تراسل العميل؟')}</h2><p>${ht('افتح بطاقة السيارة واضغط زر واتساب. راجع الرقم والرسالة، ثم افتح واتساب واضغط إرسال.')}</p><p class="hint">${ht('عند الضغط على «السيارة جاهزة» تظهر رسالة الجاهزية لتراجعها. لا يتم إرسال أي رسالة تلقائيًا.')}</p></div>`;
   if(page==='notifications')content.innerHTML=heading('إشعارات واتساب','جهّز رسالة العميل باللغة التي يفضّلها.')+`<section class="panel notification-settings"><h2>${ht('تفضيلات الرسائل')}</h2><label class="field">${ht('اللغة الافتراضية')}<select id="default-message-language">${languageOptions(preferences.language)}</select></label><label class="check-option"><input id="receipt-preview-default" type="checkbox" ${preferences.openReceiptAfterIntake?'checked':''}><span>${ht('افتح معاينة رسالة الاستلام بعد حفظ السيارة')}</span></label><p class="hint">${ht('يفتح رسالة جاهزة للمراجعة؛ تضغط إرسال بنفسك داخل واتساب.')}</p></section><section class="panel notification-settings"><div class="panel-head"><h2>${ht('الإرسال التلقائي')}</h2><span class="pill">${ht('غير متصل')}</span></div><p>${ht('إرسال الرسالة دون فتح واتساب يحتاج ربط رقم الكراج رسميًا بخدمة واتساب للأعمال وخادم إرسال آمن.')}</p><label class="check-option"><input id="auto-whatsapp-toggle" type="checkbox" disabled aria-describedby="auto-whatsapp-status"><span>${ht('إرسال رسالة تلقائيًا عند استلام السيارة')}</span></label><p id="auto-whatsapp-status" class="hint">${ht('لم يتم ربط خدمة إرسال. لا يتم إرسال أي رسالة تلقائيًا حاليًا.')}</p><details class="form-advanced"><summary>${ht('ما المطلوب لتفعيله؟')}</summary><p>${ht('حساب WhatsApp Business Platform برقم مفعّل، وقوالب رسائل عربية وإنجليزية معتمدة، وخادم يحفظ مفاتيح الربط بأمان. تطبيق واتساب على الهاتف وحده لا يفعّل هذه الخدمة.')}</p></details></section>`;
   if(page==='parts')content.innerHTML=heading('قطع الغيار','تابع المتوفر وأضف كميات جديدة.','part','قطعة جديدة')+`<section class="panel">${table(['القطعة','المتوفر','التكلفة','سعر البيع',''],state.parts.map(part=>`<tr><td><b dir="auto">${esc(part.name)}</b></td><td><span class="pill ${part.stock>5?'done':''}">${part.stock}</span></td><td>${cash(part.cost)}</td><td>${cash(part.price)}</td><td><button class="secondary" data-restock="${esc(part.id)}">${ht('إضافة كمية')}</button></td></tr>`))}</section>`;
-  if(page==='finance')content.innerHTML=heading('حسابات الكراج','ملخص لجميع العمليات المسجلة بالدرهم.','expense','مصروف جديد')+`<div class="stats">${stat('الإيرادات',cash(s.revenue),'قبل الضريبة',true)}${stat('تكلفة القطع',cash(s.cost),'وقت إصدار الفاتورة')}${stat('المصاريف',cash(s.expenses),'مصاريف التشغيل')}${stat('الربح التقديري',cash(s.profit),'بعد تكلفة القطع والمصاريف')}</div><section class="panel"><div class="panel-head"><h2>${ht('المصاريف')}</h2><span>${ht('غير المحصّل: {amount}',{amount:cash(s.unpaid)})}</span></div>${table(['الوصف','المبلغ'],state.expenses.map(expense=>`<tr><td dir="auto">${esc(expense.name)}</td><td>${cash(expense.amount)}</td></tr>`))}<div class="finance-note">${ht('الربح = الفواتير قبل الضريبة − تكلفة القطع − المصاريف. عروض الأسعار مستبعدة. هذا ملخص تجريبي.')}</div></section>`;
+  if(page==='finance')content.innerHTML=heading('حسابات الكراج','ملخص لجميع العمليات المسجلة بالدرهم.','expense','مصروف جديد')+`<div class="stats">${stat('الإيرادات',cash(s.revenue),'قبل الضريبة',true)}${stat('تكلفة القطع',cash(s.cost),'وقت إصدار الفاتورة')}${stat('المصاريف',cash(s.expenses),'مصاريف التشغيل')}${stat('الربح التقديري',cash(s.profit),'بعد تكلفة القطع والمصاريف')}</div><section class="panel"><div class="panel-head"><h2>${ht('المصاريف')}</h2><span>${ht('غير المحصّل: {amount}',{amount:cash(s.unpaid)})}</span></div>${table(['الوصف','المبلغ'],[...state.expenses,...salaryExpenseRows(state).map(entry=>({name:t('راتب: {name} — {month}',{name:entry.employeeName,month:entry.month}),amount:entry.amount}))].map(expense=>`<tr><td dir="auto">${esc(expense.name)}</td><td>${cash(expense.amount)}</td></tr>`))}<div class="finance-note">${ht('الربح = الفواتير قبل الضريبة − تكلفة القطع − المصاريف. عروض الأسعار مستبعدة. هذا ملخص تجريبي.')}</div></section>`;
   if(page==='backup')content.innerHTML=heading('احفظ نسخة من بياناتك','النسخة الاحتياطية تساعدك على استعادتها أو نقلها.')+`<section class="panel backup"><h2>${ht('بيانات هذا الجهاز')}</h2><p>${ht('بياناتك محفوظة في هذا المتصفح فقط. لا تنتقل تلقائيًا بين الآيفون والكمبيوتر، وحذف بيانات المتصفح يزيلها.')}</p><button id="export" class="primary">${icon('backup')}${ht('تنزيل نسخة احتياطية')}</button><label class="field">${ht('استعادة نسخة محفوظة')}<input id="import" type="file" accept="application/json,.json"></label><p class="hint">${ht('الاستعادة تستبدل البيانات الحالية بعد تأكيدك. احفظ ملف النسخة في مكان خاص.')}</p><details class="form-advanced"><summary>${ht('مسح البيانات')}</summary><p>${ht('صدّر نسخة أولًا إذا أردت الاحتفاظ بالبيانات.')}</p><button id="clear" class="secondary">${ht('مسح البيانات والبدء من جديد')}</button></details></section>`;
-  workshop?.decorate();
+  workshop?.decorate();operations?.decorate();
 }
 const field=(name,label,type='text',value='',extra='',required=true)=>`<label class="field">${ht(label)}<input ${required?'required':''} name="${name}" type="${type}" value="${esc(value)}" ${type==='number'?`min="0" step="${['qty','stock'].includes(name)?'1':'0.01'}"`:''} ${type==='tel'?'dir="ltr" inputmode="tel" placeholder="0501234567"':''} ${extra}></label>`;
 const select=(name,label,options,optional=false,emptyText='')=>`<label class="field">${ht(label)}<select name="${name}" ${optional?'':'required'}><option value="">${ht(emptyText||(optional?'بدون قطعة':'اختر...'))}</option>${options.map(([value,text])=>`<option value="${esc(value)}">${esc(text)}</option>`).join('')}</select></label>`;
@@ -96,6 +99,9 @@ function modelField(label){return field('model',label)+`<div id="vehicle-preview
 function notificationFields(){return `<div class="form-section notification-options"><label class="field">${ht('لغة رسالة العميل')}<select name="messageLanguage">${languageOptions(preferences.language)}</select></label><label class="check-option"><input type="checkbox" name="previewReceipt" value="yes" ${preferences.openReceiptAfterIntake?'checked':''}><span>${ht('اعرض رسالة الاستلام بعد الحفظ')}</span></label><p class="hint">${ht('هذا يفتح المعاينة فقط. الإرسال يتم من واتساب بعد مراجعتك.')}</p></div>`}
 function englishDescription(order){return field('descriptionEn','وصف الخدمة بالإنجليزية (اختياري)','text',order?.descriptionEn||'','dir="ltr" lang="en"',false)}
 function documentFields(){return `<label class="field">${ht('لغة المستند')}<select id="print-language" name="documentLanguage">${languageOptions(preferences.uiLanguage,true)}</select></label><p class="hint">${ht('وصف الخدمة يُطبع كما أُدخل؛ اختر اللغة المناسبة عند كتابته.')}</p>`}
+function guestQuoteFields(guest={}){return `<div id="guest-quote-fields">${field('guestName','اسم العميل','text',guest.customerName||'')}${field('guestPhone','رقم الهاتف (اختياري)','tel',guest.phone||'','',false)}${field('guestModel','السيارة (الشركة والموديل)','text',guest.vehicleModel||'')}<div id="guest-vehicle-preview" class="vehicle-preview">${vehiclePreviewMarkup(guest.vehicleModel||'')}</div>${field('guestPlate','رقم اللوحة والإمارة','text',guest.plate||'')}<p class="hint">${ht('يمكن إصدار العرض دون حفظ العميل في سجل العملاء.')}</p></div>`}
+function guestFrom(data){return {customerName:data.guestName,phone:data.guestPhone||'',vehicleModel:data.guestModel,plate:data.guestPlate}}
+function syncQuote(){const group=$('#guest-quote-fields'),registered=$('#fields [name="vehicleId"]');if(!group||!registered)return;const manual=!registered.value;group.hidden=!manual;group.querySelectorAll('input').forEach(input=>input.disabled=!manual)}
 function open(kind,options={}){
   $('#error').textContent='';let html='',title='',button='حفظ البيانات',afterSave;
   if(kind==='intake'){
@@ -125,19 +131,21 @@ function open(kind,options={}){
   if(kind==='restock'){title='إضافة كمية للمخزون';html=field('qty','الكمية الجديدة','number','1');submit=(next,data)=>{if(!Number.isInteger(+data.qty)||+data.qty<1)throw Error('أدخل عددًا صحيحًا موجبًا');next.parts.find(part=>part.id===options.partId).stock+=+data.qty}}
   if(kind==='expense'){title='مصروف جديد';html=field('name','وصف المصروف')+field('amount','المبلغ بالدرهم','number');submit=(next,data)=>next.expenses.push({id:id(),name:data.name.trim(),amount:amount(data.amount)})}
   if(kind==='order'||kind==='quote'){
-    if(!state.vehicles.length)return open('intake');title=kind==='quote'?'عرض سعر جديد':'فاتورة صيانة';
-    html=select('vehicleId','السيارة والعميل',state.vehicles.map(car=>[car.id,`${car.plate} — ${customer(car)?.name}`]))+field('description','الخدمة / Service description')+englishDescription()+charges()+documentFields();
-    submit=(next,data)=>createOrder(next,{...data,kind:kind==='quote'?'quote':'invoice'});
+    if(kind==='order'&&!state.vehicles.length)return open('intake');title=kind==='quote'?'عرض سعر جديد':'فاتورة صيانة';
+    html=kind==='quote'?select('vehicleId','سيارة مسجلة (اختياري)',state.vehicles.map(car=>[car.id,`${car.plate} — ${customer(car)?.name}`]),true,'إدخال العميل والسيارة يدويًا')+guestQuoteFields():select('vehicleId','السيارة والعميل',state.vehicles.map(car=>[car.id,`${car.plate} — ${customer(car)?.name}`]));
+    html+=field('description','الخدمة / Service description')+englishDescription()+charges()+documentFields();
+    submit=(next,data)=>createOrder(next,{...data,kind:kind==='quote'?'quote':'invoice',...(kind==='quote'&&!data.vehicleId?{guest:guestFrom(data)}:{})});
   }
   if(kind==='edit'){
     const order=state.orders.find(entry=>entry.id===options.orderId);if(!order)return;
     if(order.paid)return toast('ألغِ تسجيل الدفع أولًا لتعديل الفاتورة.');
-    title='تعديل الصيانة والتكلفة';html=field('description','الخدمة','text',order.description)+englishDescription(order)+charges(order);
-    submit=(next,data)=>updateOrder(next,order.id,data);
+    title='تعديل الصيانة والتكلفة';html=(order.guest?guestQuoteFields(order.guest):'')+field('description','الخدمة','text',order.description)+englishDescription(order)+charges(order);
+    submit=(next,data)=>updateOrder(next,order.id,{...data,...(order.guest?{guest:guestFrom(data)}:{})});
   }
   $('#dialog-title').textContent=t(title);$('#fields').innerHTML=html;$('#save-button').textContent=t(button);$('#form').afterSave=afterSave;
   if(kind==='edit')$('#fields [name="partId"]').value=state.orders.find(order=>order.id===options.orderId).partId;
   if(kind==='intake'){if(options.vehicleId)$('#fields [name="vehicleId"]').value=options.vehicleId;syncIntake()}
+  if(kind==='quote')syncQuote();
   $('#dialog').showModal();
 }
 function syncIntake(){
@@ -180,7 +188,7 @@ document.addEventListener('click',event=>{
   if(button.dataset.edit)open('edit',{orderId:button.dataset.edit});
   if(button.dataset.restock)open('restock',{partId:button.dataset.restock});
   if(button.dataset.message)openMessage(button.dataset.order,button.dataset.message);
-  if(button.dataset.paid)mutate(next=>{const order=next.orders.find(entry=>entry.id===button.dataset.paid);order.paid=!order.paid});
+  if(button.dataset.paid){const order=state.orders.find(entry=>entry.id===button.dataset.paid);if(!order.paid||confirm(t('إلغاء جميع الدفعات مع الاحتفاظ بسجل الإلغاء؟')))mutate(next=>{const entry=next.orders.find(order=>order.id===button.dataset.paid);if(entry.paid)voidAllPayments(next,entry.id);else recordPayment(next,entry.id,{amount:paymentSummary(entry).remaining})})}
   if(button.dataset.status){
     const order=state.orders.find(entry=>entry.id===button.dataset.status),ready=!isReady(order);
     if(mutate(next=>{next.orders.find(entry=>entry.id===order.id).status=ready?'مكتمل':'قيد العمل'},ready?'السيارة جاهزة للتسليم':'أُعيد فتح الصيانة')&&ready)openMessage(order.id,'ready');
@@ -189,10 +197,11 @@ document.addEventListener('click',event=>{
   if(button.id==='export'){
     const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})),anchor=document.createElement('a');anchor.href=url;anchor.download='zakher-backup-'+new Date().toISOString().slice(0,10)+'.json';anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  if(button.id==='clear'&&confirm(t('هل صدّرت نسخة؟ سيتم مسح جميع البيانات المحلية.')))mutate(next=>Object.assign(next,empty()));
+  if(button.id==='clear'&&confirm(t('هل صدّرت نسخة؟ سيتم مسح جميع البيانات المحلية.')))mutate(next=>{for(const key of Object.keys(next))delete next[key];Object.assign(next,empty())});
 });
 document.addEventListener('input',event=>{
   if(event.target.name==='model'&&$('#vehicle-preview'))$('#vehicle-preview').innerHTML=vehiclePreviewMarkup(event.target.value);
+  if(event.target.name==='guestModel'&&$('#guest-vehicle-preview'))$('#guest-vehicle-preview').innerHTML=vehiclePreviewMarkup(event.target.value);
   if(event.target.id==='search'){const position=event.target.selectionStart;query=event.target.value;render();$('#search').focus();if(typeof position==='number')$('#search').setSelectionRange(position,position)}
   if(['wa-phone','wa-text'].includes(event.target.id))updateMessageLink();
 });
@@ -202,7 +211,7 @@ document.addEventListener('change',async event=>{
   if(event.target.id==='default-message-language')savePreferences({language:event.target.value});
   if(event.target.id==='receipt-preview-default')savePreferences({openReceiptAfterIntake:event.target.checked});
   if(event.target.matches('.document-language')&&['ar','en','both'].includes(event.target.value))documentChoices.set(event.target.dataset.order,event.target.value);
-  if(['vehicleId','customerId'].includes(event.target.name))syncIntake();
+  if(['vehicleId','customerId'].includes(event.target.name)){syncIntake();syncQuote()}
   if(event.target.id!=='import')return;
   const file=event.target.files[0];if(!file)return;
   try{if(file.size>5_000_000)throw Error('حجم الملف أكبر من المسموح');const next=validateBackup(JSON.parse(await file.text()));if(confirm(t('استبدال جميع البيانات الحالية بالنسخة المختارة؟'))){save(next);toast('تمت استعادة النسخة')}}catch(error){toast(t('تعذّر الاستيراد: {error}',{error:t(error.message)}))}
@@ -215,9 +224,11 @@ function printOrder(orderId){
   const amountText=value=>cash(value,english?'en':'ar');
   const description=english?(order.descriptionEn||order.description):language==='both'&&order.descriptionEn&&order.descriptionEn!==order.description?`${order.description}\n${order.descriptionEn}`:order.description;
   const rows=[`<tr><td dir="auto" style="white-space:pre-wrap">${esc(description)} — ${safeLabel('أجور العمل')}</td><td>1</td><td>${amountText(order.labor)}</td></tr>`,...(order.qty?[`<tr><td dir="auto">${esc(order.partName)}</td><td>${order.qty}</td><td>${amountText(order.partPrice*order.qty)}</td></tr>`]:[])];
+  const balance=paymentSummary(order);
   const printArea=$('#print-area');printArea.dir=english?'ltr':'rtl';printArea.lang=english?'en':'ar';printArea.dataset.documentLanguage=language;
-  printArea.innerHTML=`<div class="print-head"><div><h1>${english?'ZAKHER':language==='both'?'زاخر | ZAKHER':'زاخر'}</h1><p>${safeLabel('لصيانة السيارات')}</p></div><div><h2>${safeLabel(order.kind==='quote'?'عرض سعر':'فاتورة تجريبية')}</h2><p>${safeLabel('رقم المستند')}: <bdi dir="ltr">${esc(order.number)}</bdi><br>${safeLabel('التاريخ')}: ${new Date(order.date).toLocaleDateString('en-GB')}</p></div></div><p>${safeLabel('العميل')}: <bdi>${esc(owner?.name)}</bdi><br>${safeLabel('رقم الهاتف')}: <bdi dir="ltr">${esc(owner?.phone)}</bdi><br>${safeLabel('السيارة')}: <bdi>${esc(car?.model)}</bdi><br>${safeLabel('لوحة المركبة')}: <bdi>${esc(car?.plate)}</bdi></p><div class="table-wrap"><table><thead><tr>${['الوصف','الكمية','المبلغ'].map(text=>`<th>${safeLabel(text)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div><div class="totals">${safeLabel('المجموع')}: ${amountText(order.subtotal)}<br>${safeLabel('الضريبة التجريبية ٥٪')}: ${amountText(order.tax)}<br><b>${safeLabel('الإجمالي')}: ${amountText(order.total)}</b></div><p>${safeLabel('شكرًا لثقتكم.')}<br>${safeLabel('مستند تجريبي، غير معتمد ضريبيًا.')}</p>`;
+  printArea.innerHTML=`<div class="print-head"><div><h1>${english?'ZAKHER':language==='both'?'زاخر | ZAKHER':'زاخر'}</h1><p>${safeLabel('لصيانة السيارات')}</p></div><div><h2>${safeLabel(order.kind==='quote'?'عرض سعر':'فاتورة تجريبية')}</h2><p>${safeLabel('رقم المستند')}: <bdi dir="ltr">${esc(order.number)}</bdi><br>${safeLabel('التاريخ')}: ${new Date(order.date).toLocaleDateString('en-GB')}</p></div></div><p>${safeLabel('العميل')}: <bdi>${esc(owner?.name)}</bdi><br>${safeLabel('رقم الهاتف')}: <bdi dir="ltr">${esc(owner?.phone)}</bdi><br>${safeLabel('السيارة')}: <bdi>${esc(car?.model)}</bdi><br>${safeLabel('لوحة المركبة')}: <bdi>${esc(car?.plate)}</bdi></p><div class="table-wrap"><table><thead><tr>${['الوصف','الكمية','المبلغ'].map(text=>`<th>${safeLabel(text)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div><div class="totals">${safeLabel('المجموع')}: ${amountText(order.subtotal)}<br>${safeLabel('الضريبة التجريبية ٥٪')}: ${amountText(order.tax)}<br><b>${safeLabel('الإجمالي')}: ${amountText(order.total)}</b>${order.kind==='invoice'?`<br>${safeLabel('المدفوع')}: ${amountText(balance.received)}<br>${safeLabel('المتبقي')}: ${amountText(balance.remaining)}`:''}</div><p>${safeLabel('شكرًا لثقتكم.')}<br>${safeLabel('مستند تجريبي، غير معتمد ضريبيًا.')}</p>`;
   window.print();
 }
 workshop=initializeWorkshop({getState:()=>state,saveState:save,toast,getLanguage:()=>preferences.uiLanguage,t});
+operations=initializeOperations({getState:()=>state,saveState:save,toast,getLanguage:()=>preferences.uiLanguage});
 render();

@@ -1,5 +1,5 @@
-import {vehicleArtwork} from './vehicle-art.js?v=6';
-import {SUPPORTED_SUPPLIER_BRANDS,validateVehicleVin} from './domain.js?v=6';
+import {vehicleArtwork} from './vehicle-art.js?v=7';
+import {SUPPORTED_SUPPLIER_BRANDS,validateVehicleVin} from './domain.js?v=7';
 
 export {SUPPORTED_SUPPLIER_BRANDS,validateVehicleVin};
 const supported=new Set(SUPPORTED_SUPPLIER_BRANDS);

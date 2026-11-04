@@ -43,6 +43,8 @@ export const publicFiles=Object.freeze([
   'assets/brands/README.md',
   'assets/fonts/OFL.txt',
   'assets/fonts/README.md',
+  'ledger.js',
+  'operations-ui.js',
   'i18n.js',
   'workshop.js',
   'vin.js',
