@@ -1,6 +1,6 @@
 import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=7';
 import {vehicleArtwork} from './vehicle-art.js?v=7';
-import {createTranslator} from './i18n.js?v=7';
+import {createTranslator} from './i18n.js?v=8';
 import {initializeWorkshop} from './workshop.js?v=7';
 import {orderVehicle,paymentSummary,recordPayment,voidAllPayments,isDelivered,salaryExpenseRows} from './ledger.js?v=7';
 import {initializeOperations} from './operations-ui.js?v=7';
@@ -221,12 +221,27 @@ function printOrder(orderId){
   const car=vehicle(order),owner=customer(car),language=documentLanguage(order),english=language==='en';
   const label=text=>language==='both'?`${t(text,{},'ar')} / ${t(text,{},'en')}`:t(text,{},language);
   const safeLabel=text=>esc(label(text));
-  const amountText=value=>cash(value,english?'en':'ar');
+  const amountText=value=>`<bdi dir="ltr">${esc(cash(value,english?'en':'ar'))}</bdi>`;
   const description=english?(order.descriptionEn||order.description):language==='both'&&order.descriptionEn&&order.descriptionEn!==order.description?`${order.description}\n${order.descriptionEn}`:order.description;
-  const rows=[`<tr><td dir="auto" style="white-space:pre-wrap">${esc(description)} — ${safeLabel('أجور العمل')}</td><td>1</td><td>${amountText(order.labor)}</td></tr>`,...(order.qty?[`<tr><td dir="auto">${esc(order.partName)}</td><td>${order.qty}</td><td>${amountText(order.partPrice*order.qty)}</td></tr>`]:[])];
+  const rows=[`<tr><td><div class="document-description" dir="auto">${esc(description)}</div><small class="document-item-kind">${safeLabel('أجور العمل')}</small></td><td>1</td><td>${amountText(order.labor)}</td></tr>`,...(order.qty?[`<tr><td dir="auto">${esc(order.partName)}</td><td>${order.qty}</td><td>${amountText(order.partPrice*order.qty)}</td></tr>`]:[])];
   const balance=paymentSummary(order);
+  const detail=(title,value,ltr=false)=>`<div class="document-detail"><dt>${safeLabel(title)}</dt><dd><bdi${ltr?' dir="ltr"':''}>${esc(value||'—')}</bdi></dd></div>`;
+  const totalRow=(title,value,className='')=>`<div class="document-total-row ${className}"><span>${safeLabel(title)}</span><strong>${amountText(value)}</strong></div>`;
+  const stampLabel=language==='both'?`<span lang="ar" dir="rtl">${ht('مختوم إلكترونياً',{},'ar')}</span> <span lang="en" dir="ltr">${ht('مختوم إلكترونياً',{},'en')}</span>`:safeLabel('مختوم إلكترونياً');
   const printArea=$('#print-area');printArea.dir=english?'ltr':'rtl';printArea.lang=english?'en':'ar';printArea.dataset.documentLanguage=language;
-  printArea.innerHTML=`<div class="print-head"><div><h1>${english?'ZAKHER':language==='both'?'زاخر | ZAKHER':'زاخر'}</h1><p>${safeLabel('لصيانة السيارات')}</p></div><div><h2>${safeLabel(order.kind==='quote'?'عرض سعر':'فاتورة تجريبية')}</h2><p>${safeLabel('رقم المستند')}: <bdi dir="ltr">${esc(order.number)}</bdi><br>${safeLabel('التاريخ')}: ${new Date(order.date).toLocaleDateString('en-GB')}</p></div></div><p>${safeLabel('العميل')}: <bdi>${esc(owner?.name)}</bdi><br>${safeLabel('رقم الهاتف')}: <bdi dir="ltr">${esc(owner?.phone)}</bdi><br>${safeLabel('السيارة')}: <bdi>${esc(car?.model)}</bdi><br>${safeLabel('لوحة المركبة')}: <bdi>${esc(car?.plate)}</bdi></p><div class="table-wrap"><table><thead><tr>${['الوصف','الكمية','المبلغ'].map(text=>`<th>${safeLabel(text)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div><div class="totals">${safeLabel('المجموع')}: ${amountText(order.subtotal)}<br>${safeLabel('الضريبة التجريبية ٥٪')}: ${amountText(order.tax)}<br><b>${safeLabel('الإجمالي')}: ${amountText(order.total)}</b>${order.kind==='invoice'?`<br>${safeLabel('المدفوع')}: ${amountText(balance.received)}<br>${safeLabel('المتبقي')}: ${amountText(balance.remaining)}`:''}</div><p>${safeLabel('شكرًا لثقتكم.')}<br>${safeLabel('مستند تجريبي، غير معتمد ضريبيًا.')}</p>`;
+  printArea.innerHTML=`<div class="document-sheet">
+    <div class="print-head">
+      <div class="document-brand"><span class="document-brand-mark" aria-hidden="true">ز</span><div><span class="document-eyebrow" dir="ltr">ZAKHER GARAGE</span><h1>${english?'ZAKHER':language==='both'?'زاخر | ZAKHER':'كراج زاخر'}</h1><p>${safeLabel('لصيانة السيارات')}</p></div></div>
+      <div class="document-heading"><h2>${safeLabel(order.kind==='quote'?'عرض سعر':'فاتورة تجريبية')}</h2><dl>${detail('رقم المستند',order.number,true)}${detail('التاريخ',new Date(order.date).toLocaleDateString('en-GB',{timeZone:'Asia/Dubai'}),true)}</dl></div>
+    </div>
+    <div class="document-parties">
+      <section class="document-party"><h3>${safeLabel('بيانات العميل')}</h3><dl>${detail('العميل',owner?.name)}${detail('رقم الهاتف',owner?.phone,true)}</dl></section>
+      <section class="document-party"><h3>${safeLabel('بيانات السيارة')}</h3><dl>${detail('السيارة',car?.model)}${detail('لوحة المركبة',car?.plate)}</dl></section>
+    </div>
+    <table class="document-items"><colgroup><col class="document-description-column"><col class="document-quantity-column"><col class="document-amount-column"></colgroup><thead><tr>${['الوصف','الكمية','المبلغ'].map(text=>`<th>${safeLabel(text)}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>
+    <div class="document-summary"><div class="totals">${totalRow('المجموع',order.subtotal)}${totalRow('الضريبة التجريبية ٥٪',order.tax)}${totalRow('الإجمالي',order.total,'document-grand-total')}${order.kind==='invoice'?`${totalRow('المدفوع',balance.received)}${totalRow('المتبقي',balance.remaining,'document-balance')}`:''}</div></div>
+    <div class="document-footer"><div class="document-closing"><span class="document-eyebrow" dir="ltr">ZAKHER · AUTO MAINTENANCE</span><p class="document-thanks">${safeLabel('شكرًا لثقتكم.')}</p><p class="document-disclaimer">${safeLabel('مستند تجريبي، غير معتمد ضريبيًا.')}</p></div><div class="document-seal"><div class="garage-stamp" aria-label="${safeLabel('كراج زاخر لصيانة السيارات')}"><span class="stamp-stars" aria-hidden="true">✦ &nbsp; ✦ &nbsp; ✦</span><span class="stamp-garage">${english?'ZAKHER GARAGE':'كراج زاخر'}</span><strong class="stamp-name" dir="${english?'rtl':'ltr'}">${english?'زاخر':'ZAKHER'}</strong><span class="stamp-service">${english?'AUTO MAINTENANCE':'لصيانة السيارات'}</span></div><p class="electronic-stamp">${stampLabel}</p></div></div>
+  </div>`;
   window.print();
 }
 workshop=initializeWorkshop({getState:()=>state,saveState:save,toast,getLanguage:()=>preferences.uiLanguage,t});
