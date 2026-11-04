@@ -1,4 +1,4 @@
-import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js';
+import {empty,id,amount,createOrder,updateOrder,summary,validateBackup,demo,normalizeWhatsAppPhone,buildWhatsAppUrl,serviceMessage} from './domain.js?v=3';
 
 const $=selector=>document.querySelector(selector);
 const key='zakher-garage-v1';
@@ -8,6 +8,7 @@ try {
 } catch {
   state=empty();
   $('#notice').textContent='تعذّر فتح البيانات المحفوظة. استعد نسخة احتياطية قبل إضافة بيانات جديدة.';
+  $('#notice').classList.add('notice-error');$('#content').before($('#notice'));
 }
 let page='dashboard',query='',workFilter='active',submit,toastTimer;
 const tabs=[['dashboard','car','الورشة'],['orders','file','الفواتير'],['customers','users','العملاء'],['more','menu','المزيد']];
@@ -31,8 +32,9 @@ function orderCard(order){
   const car=vehicle(order),owner=customer(car),quote=order.kind==='quote',ready=isReady(order);
   return `<article class="work-card ${ready?'ready':''}">
     <div class="card-top"><span class="pill ${quote?'blue':ready?'done':''}">${quote?'عرض سعر':ready?'جاهزة للتسليم':'داخل الورشة'}</span><span class="order-number" dir="ltr">${esc(order.number)}</span></div>
-    <h2 class="car-name" dir="auto">${esc(car?.model)}</h2><div class="plate">${esc(car?.plate)}</div>
-    <p class="customer-line">${icon('users')}<b>${esc(owner?.name)}</b></p><p class="service-description">${esc(order.description)}</p>
+    <div class="vehicle-heading"><div class="vehicle-emblem" aria-hidden="true">${icon('car')}</div><div><h2 class="car-name" dir="auto">${esc(car?.model)}</h2><span class="vehicle-subtitle">بطاقة صيانة</span></div></div>
+    <div class="plate"><span class="plate-label">لوحة المركبة</span><bdi class="plate-number" dir="auto">${esc(car?.plate)}</bdi></div>
+    <div class="card-info"><div class="info-item"><span class="info-label">العميل</span><p class="info-value customer-line">${esc(owner?.name)}</p></div><div class="info-item"><span class="info-label">الخدمة</span><p class="info-value service-description">${esc(order.description)}</p></div></div>
     ${quote?'':`<div class="card-actions">${!ready?`<button class="primary" data-status="${esc(order.id)}">${icon('check')}السيارة جاهزة</button>`:''}<button class="whatsapp" data-message="${ready?'ready':'received'}" data-order="${esc(order.id)}">${icon('chat')}${ready?'واتساب: السيارة جاهزة':'واتساب: تم الاستلام'}</button></div>`}
     <details class="order-details"><summary>${quote?'تفاصيل عرض السعر':'الفاتورة والمزيد'}</summary><p>الإجمالي: <b>${cash(order.total)}</b> <small>شامل الضريبة التجريبية ٥٪</small></p>${quote?'':`<p>الدفع: <b>${order.paid?'مدفوعة':'غير مدفوعة'}</b></p>`}<div class="details-actions">${!order.paid?`<button class="secondary" data-edit="${esc(order.id)}">تعديل الصيانة والتكلفة</button>`:''}<button class="secondary" data-print="${esc(order.id)}">طباعة ${quote?'العرض':'الفاتورة'}</button>${quote?'':`<button class="secondary" data-paid="${esc(order.id)}">${order.paid?'إلغاء تسجيل الدفع':'تسجيل الدفع'}</button>${ready?`<button class="secondary" data-status="${esc(order.id)}">إعادة فتح الصيانة</button><button class="secondary" data-message="received" data-order="${esc(order.id)}">رسالة الاستلام</button>`:''}`}</div></details>
   </article>`;
@@ -45,9 +47,9 @@ function render(){
     const invoices=[...state.orders].reverse().filter(o=>o.kind==='invoice');
     const active=invoices.filter(o=>!isReady(o)),ready=invoices.filter(isReady);
     const visible=invoices.filter(o=>(workFilter==='all'||(workFilter==='ready'?isReady(o):!isReady(o)))&&matches(o));
-    content.innerHTML=`<section class="hero"><div class="hero-copy"><h1>سيارات الورشة</h1><p>استلم سيارة جديدة أو تابع حالة الصيانة.</p></div><button class="primary intake-cta" data-add="intake">${icon('plus')}استلام سيارة</button></section>
+    content.innerHTML=`<section class="hero"><div class="hero-copy"><span class="section-kicker" dir="ltr">WORKSHOP / 01</span><h1>سيارات الورشة</h1><p>إدارة الصيانة، من الاستلام إلى التسليم.</p></div><button class="primary intake-cta" data-add="intake">${icon('plus')}استلام سيارة</button></section>
       <div class="workshop-counts" aria-label="حالة السيارات"><button class="count-card ${workFilter==='active'?'active':''}" data-filter="active" aria-pressed="${workFilter==='active'}"><strong>${active.length}</strong><span>داخل الورشة</span></button><button class="count-card ${workFilter==='ready'?'active':''}" data-filter="ready" aria-pressed="${workFilter==='ready'}"><strong>${ready.length}</strong><span>جاهزة للتسليم</span></button><button class="count-card ${workFilter==='all'?'active':''}" data-filter="all" aria-pressed="${workFilter==='all'}"><strong>${invoices.length}</strong><span>كل السيارات</span></button></div>
-      <div class="toolbar">${searchField('ابحث باسم العميل أو رقم اللوحة')}</div><div class="work-list">${visible.map(orderCard).join('')||`<div class="empty-state"><h2>${query?'لا توجد سيارة بهذه البيانات':workFilter==='ready'?'لا توجد سيارات جاهزة بعد':'لا توجد سيارات هنا حاليًا'}</h2><p>${query?'جرّب اسم العميل أو رقم اللوحة.':'اضغط «استلام سيارة» لبدء أمر جديد.'}</p></div>`}</div>`;
+      <div class="list-heading"><div><h2>${workFilter==='ready'?'جاهزة للتسليم':workFilter==='all'?'جميع السيارات':'الصيانة الجارية'}</h2><p class="list-caption">عرض ${visible.length} من ${invoices.length} سيارة</p></div><div class="toolbar">${searchField('الاسم أو اللوحة')}</div></div><div class="work-list">${visible.map(orderCard).join('')||`<div class="empty-state"><h2>${query?'لا توجد سيارة بهذه البيانات':workFilter==='ready'?'لا توجد سيارات جاهزة بعد':'لا توجد سيارات هنا حاليًا'}</h2><p>${query?'جرّب اسم العميل أو رقم اللوحة.':'اضغط «استلام سيارة» لبدء أمر جديد.'}</p></div>`}</div>`;
   }
   if(page==='orders')content.innerHTML=heading('الفواتير وعروض الأسعار','ابحث عن مستند، اطبعه، أو سجّل الدفع.','order','فاتورة جديدة')+`<div class="toolbar">${searchField('رقم الفاتورة، العميل أو اللوحة')}<button class="secondary" data-add="quote">${icon('plus')}عرض سعر</button></div><div class="work-list">${[...state.orders].reverse().filter(matches).map(orderCard).join('')||'<div class="empty-state">لا توجد مستندات مطابقة.</div>'}</div>`;
   if(page==='customers'){
@@ -163,4 +165,5 @@ function printOrder(orderId){
   $('#print-area').innerHTML=`<div class="print-head"><div><h1>زاخر | ZAKHER</h1><p>لصيانة السيارات · Auto Maintenance</p></div><div><h2>${order.kind==='quote'?'عرض سعر / Quotation':'فاتورة تجريبية / Demo Invoice'}</h2><p dir="ltr">${esc(order.number)}<br>${new Date(order.date).toLocaleDateString('en-GB')}</p></div></div><p>العميل / Customer: ${esc(owner?.name)}<br>الهاتف / Phone: ${esc(owner?.phone)}<br>السيارة / Vehicle: ${esc(car?.model)}<br>اللوحة / Plate: ${esc(car?.plate)}</p>${table(['الوصف / Description','الكمية / Qty','المبلغ / Amount'],[`<tr><td>${esc(order.description)} — أجور العمل / Labor</td><td>1</td><td>${cash(order.labor)}</td></tr>`,...(order.qty?[`<tr><td>${esc(order.partName)}</td><td>${order.qty}</td><td>${cash(order.partPrice*order.qty)}</td></tr>`]:[])])}<div class="totals">المجموع / Subtotal: ${cash(order.subtotal)}<br>الضريبة التجريبية / Demo VAT 5%: ${cash(order.tax)}<br><b>الإجمالي / Total: ${cash(order.total)}</b></div><p>شكرًا لثقتكم / Thank you for your trust.<br>مستند تجريبي، غير معتمد ضريبيًا / Demo document, not a certified tax invoice.</p>`;
   window.print();
 }
+if($('#current-date'))$('#current-date').textContent=new Intl.DateTimeFormat('ar-AE',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Dubai',calendar:'gregory'}).format(new Date());
 render();
