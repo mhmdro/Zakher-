@@ -1,3 +1,4 @@
+import {cleanGuest,paymentSummary,salaryExpenses,validateOperationalData} from './ledger.js?v=7';
 export const empty=()=>({customers:[],vehicles:[],parts:[],orders:[],expenses:[]});
 export const id=()=>crypto.randomUUID();
 export function money(n){return Math.round((Number(n)+Number.EPSILON)*100)/100}
@@ -27,7 +28,9 @@ function validNormalizedSupplierPhone(value) {
  try{return normalizeWhatsAppPhone('+'+digits)===digits}catch{return false}
 }
 export function createOrder(s,o){
- if(!s.vehicles.some(v=>v.id===o.vehicleId))throw Error('اختر سيارة مسجلة');
+ const guest=o.guest===undefined?undefined:cleanGuest(o.guest);
+ if(guest&&(o.kind!=='quote'||o.vehicleId))throw Error('الإدخال اليدوي متاح لعرض السعر فقط.');
+ if(!guest&&!s.vehicles.some(v=>v.id===o.vehicleId))throw Error('اختر سيارة مسجلة');
  if(!o.description?.trim())throw Error('أدخل وصف الخدمة');
  if(!['quote','invoice'].includes(o.kind))throw Error('نوع المستند غير صالح');
  if(o.messageLanguage!==undefined&&!['ar','en'].includes(o.messageLanguage))throw Error('اختر العربية أو الإنجليزية لرسالة واتساب.');
@@ -38,7 +41,8 @@ export function createOrder(s,o){
  if(part&&qty<1)throw Error('حدد كمية القطع');
  if(o.kind==='invoice'&&part&&qty>part.stock)throw Error('الكمية المطلوبة غير متوفرة');
  const subtotal=money(labor+(part?part.price*qty:0));
- const order={id:id(),number:`${o.kind==='quote'?'Q':'INV'}-${s.orders.length+1001}`,date:new Date().toISOString(),vehicleId:o.vehicleId,description:o.description.trim(),kind:o.kind,status:o.kind==='quote'?'عرض سعر':'قيد العمل',paid:false,labor,qty,partId:part?.id||'',partName:part?.name||'',partPrice:part?.price||0,cost:money((part?.cost||0)*qty),subtotal,tax:money(subtotal*0.05),total:money(subtotal*1.05)};
+ const order={id:id(),number:`${o.kind==='quote'?'Q':'INV'}-${s.orders.length+1001}`,date:new Date().toISOString(),vehicleId:guest?'':o.vehicleId,description:o.description.trim(),kind:o.kind,status:o.kind==='quote'?'عرض سعر':'قيد العمل',paid:false,labor,qty,partId:part?.id||'',partName:part?.name||'',partPrice:part?.price||0,cost:money((part?.cost||0)*qty),subtotal,tax:money(subtotal*0.05),total:money(subtotal*1.05)};
+ if(guest)order.guest=guest;
  if(o.messageLanguage!==undefined)order.messageLanguage=o.messageLanguage;
  if(o.documentLanguage!==undefined)order.documentLanguage=o.documentLanguage;
  if(o.descriptionEn!==undefined)order.descriptionEn=o.descriptionEn;
@@ -52,6 +56,8 @@ export function updateOrder(s,orderId,changes={}) {
  if(order.kind==='invoice'&&order.paid)throw Error('ألغِ تسجيل الدفع أولًا لتعديل الفاتورة.');
  if(!changes||typeof changes!=='object')throw Error('بيانات التعديل غير صحيحة.');
  if(changes.descriptionEn!==undefined&&(typeof changes.descriptionEn!=='string'||changes.descriptionEn.length>10000))throw Error('وصف الخدمة بالإنجليزية غير صالح أو طويل جدًا.');
+ const guest=changes.guest===undefined?undefined:cleanGuest(changes.guest);
+ if(guest&&(order.kind!=='quote'||!order.guest))throw Error('لا يمكن تغيير نوع العميل بهذا التعديل.');
  const description=changes.description===undefined?order.description:changes.description;
  if(typeof description!=='string'||!description.trim())throw Error('أدخل وصف الخدمة');
  const labor=amount(changes.labor===undefined?order.labor:changes.labor);
@@ -72,7 +78,11 @@ export function updateOrder(s,orderId,changes={}) {
  const unitCost=part?(samePart?order.cost/order.qty:part.cost):0;
  const subtotal=money(labor+partPrice*qty),tax=money(subtotal*0.05),total=money(subtotal*1.05),cost=money(unitCost*qty);
  if(![subtotal,tax,total,cost].every(Number.isFinite))throw Error('المبلغ أو الكمية أكبر من المسموح.');
+ const received=paymentSummary(order).received;
+ if(order.kind==='invoice'&&total<received)throw Error('قيمة الفاتورة الجديدة أقل من الدفعات المسجلة.');
  const updated={description:description.trim(),labor,qty,partId:part?.id||'',partName:part?(samePart?order.partName:part.name):'',partPrice,cost,subtotal,tax,total};
+ if(guest)updated.guest=guest;
+ if(Array.isArray(order.payments))updated.paid=total>0&&received===total;
  if(changes.descriptionEn!==undefined)updated.descriptionEn=changes.descriptionEn;
  // All validation is complete before either stock or the order changes.
  if(order.kind==='invoice') {
@@ -82,7 +92,7 @@ export function updateOrder(s,orderId,changes={}) {
  Object.assign(order,updated);
  return order;
 }
-export function summary(s){const invoices=s.orders.filter(o=>o.kind==='invoice');const revenue=money(invoices.reduce((a,o)=>a+o.subtotal,0)),cost=money(invoices.reduce((a,o)=>a+o.cost,0)),expenses=money(s.expenses.reduce((a,e)=>a+e.amount,0));return {revenue,cost,expenses,profit:money(revenue-cost-expenses),unpaid:money(invoices.filter(o=>!o.paid).reduce((a,o)=>a+o.total,0))}}
+export function summary(s){const invoices=s.orders.filter(o=>o.kind==='invoice');const revenue=money(invoices.reduce((a,o)=>a+o.subtotal,0)),cost=money(invoices.reduce((a,o)=>a+o.cost,0)),expenses=money(s.expenses.reduce((a,e)=>a+e.amount,0)+salaryExpenses(s));return {revenue,cost,expenses,profit:money(revenue-cost-expenses),unpaid:money(invoices.reduce((a,o)=>a+paymentSummary(o).remaining,0))}}
 export function validateBackup(s){
  if(!s||!['customers','vehicles','parts','orders','expenses'].every(k=>Array.isArray(s[k])))throw Error('ملف النسخة غير صالح');
  const str=x=>typeof x==='string',num=x=>typeof x==='number'&&Number.isFinite(x)&&x>=0;
@@ -110,7 +120,8 @@ export function validateBackup(s){
   !['manual','ai','dictionary',''].includes(x.partsRequest.translationSource)||
   (Object.hasOwn(x.partsRequest,'updatedAt')&&!validISOTime(x.partsRequest.updatedAt))
  )))throw Error('بيانات طلب قطع الغيار غير صالحة');
- if(s.orders.some(x=>!['quote','invoice'].includes(x.kind)||!str(x.number)||!str(x.description)||!str(x.status)||!str(x.date)||!str(x.partName)||typeof x.paid!=='boolean'||!s.vehicles.some(v=>v.id===x.vehicleId)||!['labor','qty','partPrice','cost','subtotal','tax','total'].every(k=>num(x[k]))))throw Error('مستند غير صالح');
+ if(s.orders.some(x=>!['quote','invoice'].includes(x.kind)||!str(x.number)||!str(x.description)||!str(x.status)||!str(x.date)||!str(x.partName)||typeof x.paid!=='boolean'||!(x.kind==='quote'&&x.guest&&x.vehicleId===''||s.vehicles.some(v=>v.id===x.vehicleId))||!['labor','qty','partPrice','cost','subtotal','tax','total'].every(k=>num(x[k]))))throw Error('مستند غير صالح');
+ validateOperationalData(s);
  return s;
 }
 export function demo(){let s=empty();s.customers=[{id:'c1',name:'أحمد المنصوري',phone:'0501234567'},{id:'c2',name:'خالد عبدالله',phone:'0507654321'}];s.vehicles=[{id:'v1',customerId:'c1',model:'Toyota Land Cruiser · 2022',plate:'أبوظبي  •  45821'},{id:'v2',customerId:'c2',model:'Nissan Patrol · 2021',plate:'أبوظبي  •  92104'}];s.parts=[{id:'p1',name:'فلتر زيت / Oil filter',stock:18,cost:25,price:45},{id:'p2',name:'زيت محرك / Engine oil',stock:4,cost:90,price:140}];createOrder(s,{vehicleId:'v1',description:'تغيير زيت المحرك والفلاتر / Oil service',kind:'invoice',labor:180,partId:'p1',qty:1});s.expenses=[{id:'e1',name:'مستلزمات الورشة',amount:40}];return s}

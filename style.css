@@ -432,3 +432,38 @@ footer{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;paddin
 html[dir=ltr] .section-kicker{text-align:left}
 @media(max-width:760px){.header-meta{gap:6px}#ui-language{min-height:42px;max-width:112px;background:#fff;color:var(--navy)}.header-meta .current-date{display:none}.header-meta .badge{display:none}#workshop-dialog{width:calc(100% - 20px);padding:18px}.supplier-brands{gap:0 10px;padding:10px}.supplier-brands .check-option{font-size:13px}#workshop-dialog .details-actions button{font-size:13px;min-height:46px;flex-basis:100%}.vin-section input[type=file]{font-size:16px}.supplier-match{padding:14px}.card-info .info-value[dir=ltr]{font-size:12px;overflow-wrap:anywhere}}
 @media(max-width:760px){.topbar{gap:10px}.header-brand{min-width:0;flex:1}.header-brand .brand-copy{min-width:0;white-space:normal}.header-brand .brand-copy p{font-size:18px}.header-meta{flex-shrink:0}.ui-language-control>span{display:none}#ui-language{width:95px;max-width:95px;padding-inline:8px;font-size:16px}}
+/* Payment balances, staff payroll and in-app follow-up. */
+.card-balance{display:flex;flex-wrap:wrap;justify-content:space-between;gap:7px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.card-balance strong{color:var(--navy);font-weight:500}
+#operations-dialog{width:min(880px,calc(100% - 28px))}
+#operations-dialog .dialog-head>div{min-width:0}
+#operations-dialog .dialog-head p{margin:7px 0 0;overflow-wrap:anywhere}
+#operations-dialog form>button.primary{width:100%;margin-top:12px}
+.money-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:17px 0;padding:16px;border:1px solid var(--line);border-radius:9px;background:#faf9f5}
+.money-summary>div{min-width:0}
+.money-summary small{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.money-summary b{display:block;font-size:17px;font-weight:500;overflow-wrap:anywhere}
+.employee-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.employee-card{min-width:0;padding:18px;border:1px solid var(--line);border-radius:10px}
+.employee-card h3{overflow-wrap:anywhere}
+.employee-card .money-summary{padding:12px;gap:12px}
+.employee-card .details-actions button{flex-basis:100%}
+.ledger-list{display:grid;gap:9px;margin-top:14px}
+.ledger-entry{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px;border:1px solid var(--line);border-radius:8px}
+.ledger-entry>div{min-width:0}
+.ledger-entry small{display:block;font-size:12px;color:var(--muted)}
+.ledger-entry p{margin:5px 0 0;font-size:13px;overflow-wrap:anywhere}
+.ledger-entry.voided{background:#f5f4f0;color:var(--muted)}
+.ledger-entry.voided b{text-decoration:line-through}
+.followup-settings{margin-top:23px;padding-top:18px;border-top:1px solid var(--line)}
+.delivery-note{padding:13px;border-radius:8px;background:#f2eee5;font-size:14px}
+.reminder-banner{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:17px 0 0;padding:14px 17px;border:1px solid #dfceb5;border-radius:9px;background:#fbf4e8;color:#73532e;font-size:14px}
+.reminder-banner>button{flex-shrink:0}
+.reminder-list{display:grid;gap:12px}
+.reminder-card{padding:18px;border:1px solid var(--line);border-radius:9px}
+.reminder-card h3{margin-top:11px}
+.reminder-card p{margin:8px 0;font-size:14px;overflow-wrap:anywhere}
+.pill.expired{color:#9d4134;background:#faeae6}
+.payroll-month-label{margin:0}
+.payroll-month-label input{width:auto;max-width:100%}
+@media(max-width:760px){#operations-dialog{width:calc(100% - 20px);padding:18px}.employee-list{grid-template-columns:minmax(0,1fr)}.reminder-banner{flex-wrap:wrap;gap:10px}.reminder-banner>button{width:100%}.money-summary{padding:13px}.money-summary b{font-size:16px}.ledger-entry{flex-wrap:wrap}.ledger-entry button{min-height:44px;font-size:13px}.payroll-month-label{max-width:100%}#operations-dialog .details-actions button{min-height:46px;font-size:13px}}
